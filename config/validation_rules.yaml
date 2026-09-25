@@ -1,0 +1,11 @@
+# Thresholds used by the Python validation pipeline (Pipeline 2).
+support_similarity_min: 0.18        # generated statement vs cited source text (below = possible hallucination)
+quiz_support_similarity_min: 0.12
+duplicate_similarity: 0.85          # modules / questions / tasks considered duplicates
+conflict_similarity: 0.58           # TF-IDF similarity: two source clauses about the same topic
+polarity_similarity: 0.28           # opposite polarity needs at least this similarity
+source_duplicate_similarity: 0.80   # two source clauses saying the same thing
+topic_min_similarity: 0.22          # topic training request must match sources at least this much
+day1_max_share: 0.4                 # warn if more than 40% of modules are on Day 1
+quiz_pass_mark: 70
+high_priority_documents: [POL-04, POL-06, POL-07, POL-08, CMP-01]

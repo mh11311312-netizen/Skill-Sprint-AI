@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block heading %}Human review queue{% endblock %}
+{% block subheading %}<p class="sub">Plans that are not fully verified, or are outdated after a policy change, wait here for a reviewer.</p>{% endblock %}
+{% block content %}
+<div class="panel"><div class="table-wrap"><table class="table align-middle">
+<thead><tr><th>Plan</th><th>Role</th><th>Status</th><th>Verification</th><th>Missing</th><th>Unsupported</th><th>Contradictions</th><th>Flags</th></tr></thead>
+{% for p in plans %}<tr><td class="text-nowrap"><a class="fw-semibold" href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a></td><td>{{ p.role }}</td><td>{{ stamp(p.status) }}</td>
+<td>{% if p.validation %}{{ stamp(p.validation.status) }}{% endif %}</td><td>{{ p.validation.scores.missing_count if p.validation else '' }}</td>
+<td>{{ p.validation.scores.unsupported_count if p.validation else '' }}</td><td>{{ p.validation.scores.contradiction_count if p.validation else '' }}</td>
+<td>{{ p.validation.issues|length if p.validation else '' }}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">Nothing waiting for review.</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

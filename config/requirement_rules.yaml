@@ -1,0 +1,10 @@
+# Deterministic rules used to extract requirements from documents (the Python ground truth).
+obligation_patterns:
+  Mandatory: '\b(must|shall|required|mandatory)\b'
+  Recommended: '\b(should|recommended|encouraged)\b'
+  Optional: '\bmay\b'
+type_patterns:            # checked in this order, only for Mandatory requirements
+  Must Acknowledge: 'acknowledg|\bsign\b|\bdeclare\b'
+  Must Demonstrate: 'demonstrat'
+  Must Complete: '\b(complete|completed|attend|submit|pass|enable|collect)\b'
+all_roles_phrases: [all employees, all staff, everyone, all roles, all new joiners]

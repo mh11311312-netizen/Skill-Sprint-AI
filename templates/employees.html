@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block heading %}Employees{% endblock %}
+{% block subheading %}<p class="sub">Profiles hold only work information - no sensitive personal data is required.</p>{% endblock %}
+{% block content %}
+{% if current_role in ('admin', 'training_manager') %}
+<div class="panel"><details><summary class="fw-semibold">Add employee</summary>
+<form method="post" class="row g-2 mt-1">{{ csrf() }}
+  <div class="col-md-2"><input class="form-control form-control-sm" name="employee_id" placeholder="Employee ID" required></div>
+  <div class="col-md-3"><input class="form-control form-control-sm" name="full_name" placeholder="Full name" required></div>
+  <div class="col-md-3"><select class="form-select form-select-sm" name="role" required><option value="">Role</option>{% for r in roles %}<option>{{ r.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><input class="form-control form-control-sm" name="department" placeholder="Department"></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="experience_level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
+  <div class="col-md-2"><input class="form-control form-control-sm" name="joining_date" placeholder="Joining YYYY-MM-DD" required></div>
+  <div class="col-md-2"><input class="form-control form-control-sm" name="location" placeholder="Location"></div>
+  <div class="col-md-2"><input class="form-control form-control-sm" name="reporting_manager" placeholder="Reporting manager"></div>
+  <div class="col-md-3"><input class="form-control form-control-sm" name="previous_experience" placeholder="Previous experience"></div>
+  <div class="col-md-3 d-flex align-items-center gap-2"><input type="checkbox" class="form-check-input" name="create_login" id="cl" checked><label for="cl" class="small">Create login</label>
+    <input class="form-control form-control-sm" name="password" type="password" placeholder="Password"></div>
+  <div class="col-md-12"><button class="btn btn-primary btn-sm">Create employee</button></div>
+</form></details></div>{% endif %}
+<div class="panel">
+<form class="row g-2 filter-bar mx-0" method="get">
+  <div class="col-md-3"><input class="form-control form-control-sm" name="search" placeholder="Search name or ID" value="{{ request.args.search or '' }}"></div>
+  <div class="col-md-3"><select class="form-select form-select-sm" name="role"><option value="">All roles</option>{% for r in roles %}<option {% if request.args.role == r.name %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="department"><option value="">All departments</option>{% for d in departments %}<option {% if request.args.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="training_status"><option value="">Any progress</option>{% for s in ['Not Started','On Track','Behind Schedule','Requires Attention','Assessment Required','Completed'] %}<option {% if request.args.training_status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><button class="btn btn-outline-primary btn-sm w-100">Filter</button></div>
+</form>
+<div class="table-wrap"><table class="table align-middle">
+<thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Level</th><th>Location</th><th>Joined</th><th>Progress</th></tr></thead>
+{% for e in emps %}<tr><td class="text-nowrap"><a class="fw-bold" href="{{ url_for('employees.detail', employee_id=e.employee_id) }}">{{ e.employee_id }}</a></td><td>{{ e.full_name }}</td><td>{{ e.role }}</td>
+<td>{{ e.experience_level }}</td><td>{{ e.location }}</td><td class="text-nowrap">{{ e.joining_date }}</td><td>{{ stamp(e.training_status or 'Not Started') }}</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

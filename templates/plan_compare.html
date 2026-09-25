@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block heading %}Compare onboarding plans{% endblock %}
+{% block content %}
+<div class="panel"><form class="row g-2" method="get">
+  {% for key in ['a','b'] %}<div class="col-md-5"><select class="form-select form-select-sm" name="{{ key }}" required><option value="">Plan {{ key|upper }}</option>
+  {% for p in all_plans %}<option value="{{ p.plan_id }}" {% if request.args[key] == p.plan_id %}selected{% endif %}>{{ p.plan_id }} · {{ p.role }}</option>{% endfor %}</select></div>{% endfor %}
+  <div class="col-md-2"><button class="btn btn-outline-primary btn-sm w-100">Compare</button></div></form></div>
+{% if diff %}
+<div class="row g-3">
+  {% for p in [pa, pb] %}<div class="col-md-6"><div class="panel"><h2>{{ p.plan_id }}</h2><p class="small">{{ p.role }} · {{ p.experience_level }} · {{ p.plan_json.modules|length }} modules · {{ stamp(p.status) }}
+  {% if p.validation %}{{ stamp(p.validation.status) }} coverage {{ p.validation.scores.coverage }}%{% endif %}</p>
+  <table class="table table-sm">{% for m in p.plan_json.modules %}<tr><td>{{ m.stage }}</td><td>{{ m.module_title }}</td><td>{{ m.requirements_covered|length }} reqs</td></tr>{% endfor %}</table></div></div>{% endfor %}
+</div>
+<div class="panel"><h2>Requirement differences (structured consistency {{ diff.consistency.consistency_score }}%)</h2>
+  <p class="small"><b>Common ({{ diff.common|length }}):</b> {{ diff.common|join(', ') }}</p>
+  <p class="small"><b>Only in A ({{ diff.only_a|length }}):</b> {{ diff.only_a|join(', ') or '-' }}</p>
+  <p class="small"><b>Only in B ({{ diff.only_b|length }}):</b> {{ diff.only_b|join(', ') or '-' }}</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block heading %}Dashboard{% endblock %}
+{% block subheading %}<p class="sub">Sources, requirements, plans and compliance coverage at a glance.</p>{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.documents_active, "Active documents", icon='file-earmark-text') }}</div>
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.mandatory, "Mandatory requirements", icon='list-check') }}</div>
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.employees, "Employees", icon='people') }}</div>
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.avg_coverage ~ "%", "Average coverage", icon='bullseye', good=stats.avg_coverage >= 95) }}</div>
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.avg_traceability ~ "%", "Average traceability", icon='link-45deg', good=stats.avg_traceability >= 95) }}</div>
+  <div class="col-sm-6 col-xl-2">{{ metric(stats.pending_review, "Plans need review", stats.pending_review > 0, icon='inbox') }}</div>
+</div>
+<div class="row g-3 mb-1">
+  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-pie-chart"></i>Plans by status</h2>
+    {% if by_status %}<div style="height:220px"><canvas id="c1" aria-label="Plans by status chart"></canvas></div>{% else %}<p class="muted m-0">No plans generated yet.</p>{% endif %}</div></div>
+  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-activity"></i>Employee progress</h2>
+    <div style="height:220px"><canvas id="c2" aria-label="Employee progress chart"></canvas></div></div></div>
+  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-heart-pulse"></i>Source health</h2>
+    <table class="table">
+      <tr><td>Superseded versions kept</td><td class="text-end fw-bold">{{ stats.documents_superseded }}</td></tr>
+      <tr><td>Flagged or untrusted documents</td><td class="text-end fw-bold {% if stats.documents_flagged %}text-danger{% endif %}">{{ stats.documents_flagged }}</td></tr>
+      <tr><td>Source conflicts resolved</td><td class="text-end fw-bold">{{ stats.conflicts }}</td></tr>
+      <tr><td>Security events</td><td class="text-end fw-bold">{{ stats.security_events }}</td></tr>
+      <tr><td>Active requirements</td><td class="text-end fw-bold">{{ stats.requirements }}</td></tr>
+    </table>
+    <a class="d-inline-block mt-3 small fw-semibold" href="{{ url_for('admin.security') }}">Open security log <i class="bi bi-chevron-right"></i></a></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-xl-7"><div class="panel"><h2><i class="bi bi-person-badge"></i>Roles</h2>
+    <div class="table-wrap"><table class="table align-middle">
+      <thead><tr><th>Role</th><th class="text-end">Mandatory</th><th class="text-end">Employees</th><th class="text-end">Coverage</th><th style="width:28%">Progress</th></tr></thead>
+      <tbody>{% for r in role_stats %}<tr><td><a class="fw-semibold" href="{{ url_for('roles.detail', name=r.role) }}">{{ r.role }}</a></td><td class="text-end">{{ r.mandatory }}</td>
+      <td class="text-end">{{ r.employees }}</td><td class="text-end">{% if r.coverage is not none %}{{ r.coverage }}%{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td><div class="d-flex align-items-center gap-2"><div class="progress flex-grow-1" role="progressbar" aria-valuenow="{{ r.progress }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ r.progress }}%"></div></div><span class="small muted" style="width:3rem">{{ r.progress }}%</span></div></td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  <div class="col-xl-5"><div class="panel"><h2><i class="bi bi-flag"></i>Plans needing attention</h2>
+    {% if flagged %}<div class="table-wrap"><table class="table align-middle"><thead><tr><th>Plan</th><th>Validation</th><th class="text-end">Coverage</th></tr></thead><tbody>
+    {% for p in flagged %}<tr><td><a class="fw-semibold" href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.employee_id }}</a><div class="small muted">{{ p.role }}</div></td>
+    <td>{{ stamp(p.validation.status) }}</td><td class="text-end">{{ p.validation.scores.coverage }}%</td></tr>{% endfor %}</tbody></table></div>
+    {% else %}<p class="muted m-0">Nothing needs attention right now.</p>{% endif %}</div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+Chart.defaults.font.family = '"Jakarta", "Segoe UI", sans-serif';
+Chart.defaults.color = '#5d6b82';
+const colours = {'Approved':'#157347','Verified':'#157347','Completed':'#157347','On Track':'#2457d6',
+  'Pending Review':'#e0a526','Generated':'#6f8fd8','Assessment Required':'#e0a526','Outdated':'#a15c00',
+  'Rejected':'#c0322b','Behind Schedule':'#c0322b','Requires Attention':'#c0322b','Not Started':'#c9d3e0'};
+function donut(id, data){ const el = document.getElementById(id); if (!el) return; const labels = Object.keys(data);
+  new Chart(el, {type:'doughnut', data:{labels, datasets:[{data:Object.values(data), borderWidth:2, borderColor:'#fff',
+    backgroundColor:labels.map(l => colours[l] || '#8a97ab')}]},
+    options:{maintainAspectRatio:false, cutout:'68%', plugins:{legend:{position:'right', labels:{boxWidth:10, boxHeight:10, padding:12}}}}}); }
+donut('c1', {{ by_status|tojson }}); donut('c2', {{ training|tojson }});
+</script>
+{% endblock %}

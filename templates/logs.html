@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block heading %}Logs and audit trail{% endblock %}
+{% block content %}
+<div class="panel"><h2>GenAI API calls</h2><div class="table-wrap"><table class="table table-sm"><thead><tr><th>At</th><th>Request</th><th>Purpose</th><th>Attempt</th><th>Model</th><th>OK</th><th>Seconds</th><th>Error</th></tr></thead>
+{% for l in gen %}<tr><td>{{ l.at|dt }}</td><td class="small">{{ l.request_id }}</td><td>{{ l.purpose }}</td><td>{{ l.attempt }}</td><td class="small">{{ l.model }}</td><td>{{ stamp('Yes' if l.ok else 'No') }}</td><td>{{ l.seconds }}</td><td class="small">{{ l.error or '' }}</td></tr>{% endfor %}</table></div></div>
+<div class="panel"><h2>Matrix builds</h2><table class="table table-sm"><tr><th>At</th><th>By</th><th>Active</th><th>Mandatory</th><th>Conflicts</th><th>Duplicates</th></tr>
+{% for b in builds %}<tr><td>{{ b.built_at|dt }}</td><td>{{ b.by }}</td><td>{{ b.active }}</td><td>{{ b.mandatory }}</td><td>{{ b.conflicts }}</td><td>{{ b.duplicates }}</td></tr>{% endfor %}</table></div>
+<div class="panel"><h2>Audit trail</h2><div class="table-wrap"><table class="table table-sm"><thead><tr><th>At</th><th>User</th><th>Action</th><th>Entity</th><th>Before</th><th>After</th><th>Comment</th></tr></thead>
+{% for a in audit %}<tr><td>{{ a.at|dt }}</td><td>{{ a.user }}</td><td>{{ a.action }}</td><td class="small">{{ a.entity }} {{ a.entity_id }}</td><td class="small">{{ a.before if a.before is not none else '' }}</td><td class="small">{{ a.after if a.after is not none else '' }}</td><td class="small">{{ a.comment }}</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

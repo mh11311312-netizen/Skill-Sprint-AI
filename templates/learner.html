@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block heading %}Welcome, {{ e.full_name }}{% endblock %}
+{% block subheading %}<p class="sub">{{ e.role }} · joined {{ e.joining_date }}{% if r %} · day {{ r.day }} of onboarding{% endif %}</p>{% endblock %}
+{% block content %}
+{% if not plan %}<div class="panel"><p class="m-0">Your onboarding plan has not been approved yet. Please check back later or contact your reporting manager.</p></div>
+{% else %}
+{% if plan.status != 'Approved' %}<div class="alert alert-info small">A company policy changed recently. Some modules of your plan are being updated and reviewed; you can keep working on the rest.</div>{% endif %}
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="panel h-100"><div class="muted small">Your status</div>{{ stamp(r.status, 'lg') }}</div></div>
+  <div class="col-md-9"><div class="panel h-100"><div class="row g-3">
+    {% for label, val in [('Overall', r.overall), ('Modules', r.module_pct), ('Checklist', r.checklist_pct), ('Tasks', r.task_pct), ('Quiz average', r.quiz_avg)] %}
+    <div class="col-6 col-md"><div class="small d-flex justify-content-between"><span>{{ label }}</span><b>{{ val }}%</b></div><div class="progress"><div class="progress-bar" style="width: {{ val }}%"></div></div></div>{% endfor %}
+  </div></div></div>
+</div>
+{% if r.recommendations %}<div class="panel"><h2>Recommended next steps</h2>{% for x in r.recommendations %}<div class="small mb-1"><span class="stamp stamp-info">{{ x.type }}</span> {{ x.text }}</div>{% endfor %}</div>{% endif %}
+{% set p = r.progress %}
+{% for m in plan.plan_json.modules|by_stage %}{% set done = m.module_id in p.modules_done %}
+<div class="module-card {% if done %}done{% endif %}" id="{{ m.module_id }}">
+  <div class="d-flex justify-content-between flex-wrap gap-2"><div><span class="stage-label {% if m.module_id in r.overdue %}overdue{% endif %}">{{ m.stage }}{% if m.module_id in r.overdue %} · overdue{% endif %}</span>
+    <h3 class="h6 m-0">{{ m.module_title }}</h3><div class="small muted">{{ 'Mandatory' if m.mandatory else 'Optional' }} · {{ m.estimated_duration_minutes }} min · {{ m.difficulty }}</div></div>
+    <div class="d-flex gap-2 align-items-start">
+      {% if m.quiz %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('learner.quiz', module_id=m.module_id) }}">Quiz{% if m.module_id in r.best_scores %} (best {{ r.best_scores[m.module_id] }}%){% endif %}</a>{% endif %}
+      <form method="post" action="{{ url_for('learner.toggle') }}">{{ csrf() }}<input type="hidden" name="kind" value="module"><input type="hidden" name="key" value="{{ m.module_id }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
+      <button class="btn btn-sm {% if done %}btn-success{% else %}btn-primary{% endif %}">{% if done %}Completed ✓{% else %}Mark module complete{% endif %}</button></form></div></div>
+  <p class="small mt-2 mb-1">{{ m.purpose }}</p>
+  <details><summary class="small">Objectives, checklist and tasks</summary>
+    <ul class="small mt-2">{% for o in m.learning_objectives %}<li>{{ o }}</li>{% endfor %}</ul>
+    <b class="small">Checklist</b>
+    {% for c in m.checklist %}{% set key = m.module_id ~ ':' ~ loop.index0 %}
+    <form method="post" action="{{ url_for('learner.toggle') }}" class="small">{{ csrf() }}<input type="hidden" name="kind" value="checklist"><input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
+      <button class="btn btn-link btn-sm p-0 text-start">{{ '☑' if key in p.checklist_done else '☐' }} {{ c.activity }}</button> <span class="muted">({{ c.due_stage }}, {{ c.source_document_id }} §{{ c.source_section_id }})</span></form>{% endfor %}
+    <b class="small d-block mt-2">Tasks</b>
+    {% for t in m.tasks %}<form method="post" action="{{ url_for('learner.toggle') }}" class="small mb-1">{{ csrf() }}<input type="hidden" name="kind" value="task"><input type="hidden" name="key" value="{{ t.task_id }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
+      <button class="btn btn-link btn-sm p-0 text-start">{{ '☑' if t.task_id in p.tasks_done else '☐' }} {{ t.description }}</button><div class="muted">Done when: {{ t.completion_criteria }}</div></form>{% endfor %}
+  </details>
+</div>{% endfor %}
+{% endif %}
+{% endblock %}

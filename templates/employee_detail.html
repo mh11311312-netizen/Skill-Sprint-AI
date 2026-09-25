@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block heading %}{{ e.full_name }}{% endblock %}
+{% block subheading %}<p class="sub">{{ e.employee_id }} · {{ e.role }} · {{ e.department }} · {{ e.experience_level }} · joined {{ e.joining_date }} · reports to {{ e.reporting_manager }}</p>{% endblock %}
+{% block content %}
+<div class="row g-3">
+<div class="col-lg-7"><div class="panel"><h2>Onboarding plans</h2>
+  {% if current_role in ('admin', 'training_manager') %}
+  <form method="post" action="{{ url_for('plans.generate', employee_id=e.employee_id) }}" class="mb-3">{{ csrf() }}
+    <button class="btn btn-primary btn-sm" onclick="this.disabled=true;this.innerText='Generating and validating… (up to a minute)';this.form.submit();">Generate personalised plan with GenAI</button>
+    <span class="small muted ms-2">Pipeline 1 generates, Pipeline 2 validates automatically.</span></form>{% endif %}
+  <table class="table"><thead><tr><th>Plan</th><th>Created</th><th>Status</th><th>Validation</th><th>Coverage</th></tr></thead>
+  {% for p in plans %}<tr><td><a href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a></td><td>{{ p.created_at|dt }}</td><td>{{ stamp(p.status) }}</td>
+  <td>{% if p.validation %}{{ stamp(p.validation.status) }}{% endif %}</td><td>{% if p.validation %}{{ p.validation.scores.coverage }}%{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5" class="muted">No plan yet.</td></tr>{% endfor %}</table></div></div>
+<div class="col-lg-5"><div class="panel"><h2>Progress</h2>
+  {% if progress %}<p>{{ stamp(progress.status, 'lg') }} <span class="muted small">day {{ progress.day }} of onboarding</span></p>
+  {% for label, v in [('Overall', progress.overall), ('Modules', progress.module_pct), ('Checklist', progress.checklist_pct), ('Tasks', progress.task_pct), ('Quiz average', progress.quiz_avg)] %}
+  <div class="small d-flex justify-content-between"><span>{{ label }}</span><span>{{ v }}%</span></div><div class="progress mb-2"><div class="progress-bar" style="width: {{ v }}%"></div></div>{% endfor %}
+  {% if progress.weak_areas %}<h3 class="h6 mt-3">Weak areas</h3>{% for w in progress.weak_areas %}<div class="small">{{ w.topic }} - best {{ w.best_score }}% after {{ w.attempts }} attempt(s)</div>{% endfor %}{% endif %}
+  {% if progress.recommendations %}<h3 class="h6 mt-3">Recommendations</h3>{% for r in progress.recommendations %}<div class="small"><b>{{ r.type }}:</b> {{ r.text }}</div>{% endfor %}{% endif %}
+  {% else %}<p class="muted m-0">Progress is tracked once a plan is approved.</p>{% endif %}</div></div>
+</div>
+{% endblock %}

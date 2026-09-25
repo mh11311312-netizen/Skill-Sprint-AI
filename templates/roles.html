@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block heading %}Job roles{% endblock %}
+{% block subheading %}<p class="sub">Adding a role rebuilds the matrix from the stored documents - no code change needed.</p>{% endblock %}
+{% block content %}
+{% if current_role in ('admin', 'training_manager') %}
+<div class="panel"><h2>Add a role</h2>
+<form method="post" class="row g-2">{{ csrf() }}
+  <div class="col-md-3"><input class="form-control form-control-sm" name="name" placeholder="Role name (e.g. Loan Officer)" required></div>
+  <div class="col-md-3"><input class="form-control form-control-sm" name="department" placeholder="Department"></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="default_level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
+  <div class="col-md-3"><input class="form-control form-control-sm" name="description" placeholder="Short description"></div>
+  <div class="col-md-1"><button class="btn btn-primary btn-sm w-100">Add</button></div>
+</form></div>{% endif %}
+<div class="panel"><div class="table-wrap"><table class="table">
+<thead><tr><th>ID</th><th>Role</th><th>Department</th><th>Requirements</th><th>Mandatory</th><th>Role-specific</th><th>Employees</th></tr></thead>
+{% for r in roles %}<tr><td>{{ r.role_id }}</td><td><a href="{{ url_for('roles.detail', name=r.name) }}">{{ r.name }}</a></td><td>{{ r.department }}</td>
+<td>{{ r.total }}</td><td>{{ r.mandatory }}</td><td>{{ r.specific }}</td><td>{{ r.employees }}</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

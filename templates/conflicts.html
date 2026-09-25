@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block heading %}Conflicts, duplicates and gaps{% endblock %}
+{% block subheading %}<p class="sub">Detected between active source documents and resolved with the precedence rules in config/precedence_rules.yaml.</p>{% endblock %}
+{% block content %}
+<div class="panel"><h2>Source conflicts ({{ conflicts|length }})</h2><div class="table-wrap"><table class="table">
+<thead><tr><th>Type</th><th>Statement A</th><th>Statement B</th><th>Outcome</th></tr></thead>
+{% for c in conflicts %}<tr><td>{{ c.type }}<div class="small muted">similarity {{ c.similarity }}</div></td>
+<td><span class="src">{{ c.a.id }}</span> <span class="small muted">({{ c.a.category }}, {{ c.a.effective_date }})</span><br>{{ c.a.text }}</td>
+<td><span class="src">{{ c.b.id }}</span> <span class="small muted">({{ c.b.category }}, {{ c.b.effective_date }})</span><br>{{ c.b.text }}</td>
+<td>{{ stamp(c.status) }}{% if c.winner %}<div class="small mt-1">Winner: <b>{{ c.winner }}</b></div>{% endif %}<div class="small muted">{{ c.rule }}</div></td></tr>
+{% else %}<tr><td colspan="4" class="muted">No conflicts detected.</td></tr>{% endfor %}</table></div></div>
+<div class="row g-3">
+<div class="col-lg-6"><div class="panel"><h2>Duplicates ({{ duplicates|length }})</h2><table class="table">{% for d in duplicates %}<tr><td class="src">{{ d.duplicate }}</td><td>duplicates</td><td class="src">{{ d.keep }}</td><td class="small muted">{{ d.similarity }}</td></tr>{% endfor %}</table></div></div>
+<div class="col-lg-6"><div class="panel"><h2>Missing referenced documents</h2>
+{% for m in missing %}<div class="small mb-2"><b>{{ m.referenced }}</b> referenced in <span class="src">{{ m.statement }}</span> is not in the document store.</div>{% else %}<p class="muted small m-0">None.</p>{% endfor %}
+{% if unmapped %}<h2 class="mt-3">Unknown role names in "Applies to"</h2>{% for u in unmapped %}<span class="stamp stamp-warn me-1">{{ u.name }}</span>{% endfor %}<p class="small muted mt-1">Add these roles on the Roles page and the matrix is rebuilt automatically.</p>{% endif %}
+{% if review %}<h2 class="mt-3">Needs manual review</h2>{% for r in review %}<div class="small src">{{ r.requirement_id }}</div>{% endfor %}{% endif %}
+</div></div></div>
+{% endblock %}

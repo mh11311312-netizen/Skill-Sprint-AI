@@ -1,0 +1,13 @@
+﻿role_id,role,department,default_level,description
+ROLE-01,Branch Manager,Retail Banking,Advanced,"The Branch Manager leads all branch operations, branch staff and customer service at the branch."
+ROLE-02,Customer Service Officer,Customer Service,Beginner,"The Customer Service Officer handles customer enquiries, complaints and service requests."
+ROLE-03,Sales Executive,Retail Banking,Beginner,The Sales Executive acquires new customers and sells deposit and card products.
+ROLE-04,HR Executive,Human Resources,Intermediate,"The HR Executive supports recruitment, onboarding, employee records and exits."
+ROLE-05,Finance Associate,Finance,Intermediate,"The Finance Associate processes payments, reconciliations and month-end reporting."
+ROLE-06,Operations Coordinator,Operations,Intermediate,The Operations Coordinator oversees branch back-office processing and vault operations.
+ROLE-07,IT Support Engineer,Information Technology,Intermediate,"The IT Support Engineer resolves hardware, software and access issues for bank staff."
+ROLE-08,Compliance Officer,Compliance,Advanced,The Compliance Officer monitors adherence to regulatory requirements and internal policies.
+ROLE-09,Marketing Executive,Marketing,Intermediate,The Marketing Executive plans and runs marketing campaigns across digital and branch channels.
+ROLE-10,Data Analyst,Data and Analytics,Intermediate,"The Data Analyst prepares dashboards, reports and analysis for management decisions."
+ROLE-11,Cash Teller,Retail Banking,Beginner,"The Cash Teller handles cash deposits, withdrawals and counter transactions."
+ROLE-12,Team Leader,Operations,Advanced,The Team Leader supervises a team of 5 to 10 staff in operations or customer service.

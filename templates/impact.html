@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block heading %}Policy update impact{% endblock %}
+{% block subheading %}<p class="sub">When a new version of a document is uploaded, every plan item that cites a changed section is found and only those modules are regenerated.</p>{% endblock %}
+{% block content %}
+<div class="panel"><h2>Outdated plans ({{ outdated|length }})</h2>
+{% for p in outdated %}<div class="small mb-2"><a href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a> · {{ p.role }} · {{ p.employee_id }} -
+{{ p.outdated.document_id }} v{{ p.outdated.old_version }} → v{{ p.outdated.new_version }}; modules {{ p.outdated.modules|join(', ') }}</div>
+{% else %}<p class="muted small m-0">No outdated plans.</p>{% endfor %}</div>
+{% for r in reports %}<div class="panel"><h2>{{ r.document_id }} v{{ r.old_version }} → v{{ r.new_version }} <span class="muted small fw-normal">{{ r.detected_at|dt }}</span></h2>
+  <p class="small">Changed sections: {{ r.changed_sections|join(', ') or 'none' }} · affected plans: {{ r.plans|length }}</p>
+  {% if r.plans %}<table class="table table-sm"><tr><th>Plan</th><th>Employee</th><th>Role</th><th>Modules</th><th>Quiz questions</th><th>Tasks</th><th>Checklist items</th></tr>
+  {% for p in r.plans %}<tr><td><a href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a></td><td>{{ p.employee_id }}</td><td>{{ p.role }}</td><td>{{ p.modules|join(', ') }}</td><td>{{ p.questions|join(', ') }}</td><td>{{ p.tasks|join(', ') }}</td><td>{{ p.checklist|length }}</td></tr>{% endfor %}</table>{% endif %}</div>
+{% endfor %}
+{% endblock %}

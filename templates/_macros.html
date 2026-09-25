@@ -1,0 +1,18 @@
+{% macro stamp(value, size='') -%}
+<span class="{{ value|status_class }} {% if size %}stamp-{{ size }}{% endif %}">{{ value }}</span>
+{%- endmacro %}
+{% macro src(doc, sec) -%}
+<span class="src">{{ doc }} §{{ sec }}</span>
+{%- endmacro %}
+{% macro csrf() -%}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{%- endmacro %}
+{# Card with icon: used on dashboards #}
+{% macro metric(value, label, alert=False, icon='bar-chart-line', good=False) -%}
+<div class="metric {% if alert %}is-alert{% elif good %}good{% endif %}">
+  <div class="metric-icon"><i class="bi bi-{{ icon }}"></i></div>
+  <div><div class="v">{{ value }}</div><div class="l">{{ label }}</div></div>
+</div>
+{%- endmacro %}
+{# Compact number without a card: used inside panels #}
+{% macro mini(value, label, alert=False) -%}
+<div class="metric-plain {% if alert %}is-alert{% endif %}"><div class="v">{{ value }}</div><div class="l">{{ label }}</div></div>
+{%- endmacro %}

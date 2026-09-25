@@ -1,0 +1,25 @@
+# Sitara Bank - document precedence rules
+# Lower level number = higher authority.
+rules:
+  - rule: 1
+    description: Superseded versions are never used; only the Active version of a document applies.
+  - rule: 2
+    description: When two active documents conflict, the document with the lower precedence level wins.
+  - rule: 3
+    description: When both documents have the same precedence level, the later effective_date wins.
+  - rule: 4
+    description: A specific rule for a named role or module applies within its scope and does not contradict a general rule.
+  - rule: 5
+    description: Documents with category Informal Guidance or Guideline, or with an unknown owner, cannot create or override requirements; they are routed to manual review.
+  - rule: 6
+    description: If no rule resolves the conflict, the item is marked Manual Review Required.
+precedence_levels:
+  Policy: 1
+  Compliance: 2
+  SOP: 3
+  Handbook: 4
+  Role Description: 5
+  Process Manual: 6
+  FAQ: 7
+  Guideline: 8
+  Informal Guidance: 8

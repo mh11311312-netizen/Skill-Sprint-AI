@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block heading %}Role Requirement Matrix{% endblock %}
+{% block subheading %}<p class="sub">Built by Python rules from the uploaded documents - the independent ground truth for validation.
+{% if build %}Last build {{ build.built_at|dt }}: {{ build.active }} active, {{ build.mandatory }} mandatory, {{ build.role_specific }} role-specific.{% endif %}</p>{% endblock %}
+{% block content %}
+<div class="panel">
+<form class="row g-2 filter-bar mx-0" method="get">
+  <div class="col-md-2"><select class="form-select form-select-sm" name="role"><option value="">All roles</option>{% for r in roles %}<option {% if request.args.role == r.name %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="document_id"><option value="">All documents</option>{% for d in doc_ids %}<option {% if request.args.document_id == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="obligation"><option value="">Any obligation</option>{% for o in ['Mandatory','Recommended','Optional'] %}<option {% if request.args.obligation == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="role_scope"><option value="">Any scope</option>{% for o in ['All Roles','Role-Specific'] %}<option {% if request.args.role_scope == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="active"><option value="yes">Active only</option><option value="all" {% if request.args.active == 'all' %}selected{% endif %}>Include overridden</option></select></div>
+  <div class="col-md-1"><button class="btn btn-outline-primary btn-sm w-100">Filter</button></div>
+</form>
+{% if current_role in ('admin','training_manager') %}<form method="post" action="{{ url_for('matrix.rebuild') }}" class="mb-2">{{ csrf() }}<button class="btn btn-sm btn-outline-primary">Rebuild matrix now</button></form>{% endif %}
+<p class="small muted">{{ reqs|length }} rows</p>
+<div class="table-wrap"><table class="table">
+<thead><tr><th>ID</th><th>Requirement</th><th>Roles</th><th>Obligation</th><th>Type</th><th>Priority</th><th>Stage</th><th>Assessment</th><th>Status</th></tr></thead>
+{% for r in reqs %}<tr><td><a class="src" href="{{ url_for('documents.detail', doc_key=r.document_id ~ '@' ~ r.version) }}#s{{ r.section_id }}">{{ r.requirement_id }}</a></td>
+<td>{{ r.text }}<div class="small muted">{{ r.competency }}{% if r.prerequisites %} · needs {{ r.prerequisites|join(', ') }}{% endif %}</div></td>
+<td class="small">{{ 'All roles' if r.role_scope == 'All Roles' else r.roles|join(', ') }}</td><td>{{ stamp(r.obligation) }}</td><td class="small">{{ r.requirement_type }}</td>
+<td>{{ r.priority }}</td><td class="small">{{ r.due_stage }}</td><td class="small">{{ r.assessment }}</td>
+<td>{% if r.overridden_by %}<span class="stamp stamp-bad">Overridden by {{ r.overridden_by }}</span>{% elif r.duplicate_of %}<span class="stamp stamp-muted">Duplicate of {{ r.duplicate_of }}</span>{% else %}{{ stamp('Active') }}{% endif %}</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

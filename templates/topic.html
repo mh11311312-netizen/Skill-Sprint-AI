@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block heading %}Training on a requested topic{% endblock %}
+{% block subheading %}<p class="sub">The system first checks with Python whether approved documents cover the topic. If not, nothing is generated and the request goes to manual review.</p>{% endblock %}
+{% block content %}
+<div class="panel"><form method="post" class="d-flex gap-2">{{ csrf() }}<input class="form-control" name="topic" placeholder="e.g. Password rules, or Cryptocurrency trading" required value="{{ result.topic if result else '' }}"><button class="btn btn-primary">Request</button></form></div>
+{% if result %}<div class="panel">
+  {% if result.refused %}<p>{{ stamp('Manual Review Required', 'lg') }}</p><p>{{ result.reason }}</p><p class="small muted">Best source similarity: {{ result.best_similarity }}</p>
+  {% else %}{% set m = result.module %}<p>{{ stamp('Generated', 'lg') }} <span class="small muted">sources used: {{ result.sources|join(', ') }}</span></p>
+  <h3 class="h6">{{ m.module_title }}</h3><p class="small">{{ m.purpose }}</p>
+  <ul class="small">{% for o in m.learning_objectives %}<li>{{ o }}</li>{% endfor %}</ul>
+  {% for q in m.quiz %}<div class="small mb-1"><b>{{ q.question }}</b> {{ src(q.source_document_id, q.source_section_id) }} → {{ q.correct_answers|join(', ') }}</div>{% endfor %}{% endif %}
+</div>{% endif %}
+{% endblock %}

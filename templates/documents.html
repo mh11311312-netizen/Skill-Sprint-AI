@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block heading %}Company documents{% endblock %}
+{% block subheading %}<p class="sub">Upload PDF or DOCX. Metadata is read from the document control table; fields you type below override it.</p>{% endblock %}
+{% block content %}
+{% if current_role in ('admin', 'training_manager') %}
+<div class="panel"><h2><i class="bi bi-cloud-arrow-up"></i>Upload documents</h2>
+<form method="post" action="{{ url_for('documents.upload') }}" enctype="multipart/form-data">{{ csrf() }}
+  <div class="dropzone">
+    <i class="bi bi-file-earmark-arrow-up big"></i>
+    <div class="fw-bold mt-1">Choose one or more company documents</div>
+    <div class="small muted">PDF, DOCX, TXT or MD, up to 10 MB each. Metadata is read from each file's document control table.</div>
+    <label class="visually-hidden" for="files">Files</label>
+    <input id="files" class="form-control" type="file" name="files" multiple accept=".pdf,.docx,.txt,.md" required>
+  </div>
+  <details class="mt-3"><summary>Enter or correct metadata for a single file (optional)</summary>
+  <div class="row g-2 mt-1">
+    <div class="col-md-2"><input class="form-control form-control-sm" name="document_id" placeholder="Document ID (POL-09)"></div>
+    <div class="col-md-4"><input class="form-control form-control-sm" name="title" placeholder="Title"></div>
+    <div class="col-md-2"><select class="form-select form-select-sm" name="category"><option value="">Category</option>{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="department" placeholder="Department"></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="version" placeholder="Version (2.0)"></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="effective_date" placeholder="Effective YYYY-MM-DD"></div>
+    <div class="col-md-2"><input class="form-control form-control-sm" name="review_date" placeholder="Expiry YYYY-MM-DD"></div>
+    <div class="col-md-3"><input class="form-control form-control-sm" name="owner" placeholder="Owner"></div>
+  </div></details>
+  <button class="btn btn-primary mt-3"><i class="bi bi-upload"></i>Upload and process</button>
+</form></div>
+{% endif %}
+<div class="panel"><div class="panel-head"><h2><i class="bi bi-folder2-open"></i>Document library</h2><span class="small muted">{{ docs|length }} documents</span></div>
+<form class="row g-2 filter-bar mx-0" method="get">
+  <div class="col-md-3"><input class="form-control form-control-sm" name="search" placeholder="Search title or ID" value="{{ request.args.search or '' }}"></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="category"><option value="">All categories</option>{% for c in categories %}<option {% if request.args.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="status"><option value="">All statuses</option>{% for s in ['Active','Superseded'] %}<option {% if request.args.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="trust"><option value="">Any trust</option>{% for s in ['Trusted','Suspicious','Untrusted'] %}<option {% if request.args.trust == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><select class="form-select form-select-sm" name="department"><option value="">All departments</option>{% for d in departments %}<option {% if request.args.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="col-md-1"><button class="btn btn-outline-primary btn-sm w-100">Filter</button></div>
+</form>
+<div class="table-wrap"><table class="table align-middle">
+<thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Version</th><th>Status</th><th>Trust</th><th>Effective</th><th>Sections</th><th>Flags</th></tr></thead>
+{% for d in docs %}<tr>
+  <td class="text-nowrap"><a class="fw-bold" href="{{ url_for('documents.detail', doc_key=d.doc_key) }}">{{ d.document_id }}</a></td><td class="fw-semibold">{{ d.title }}<div class="small muted">{{ d.department }}</div></td><td>{{ d.category }}</td>
+  <td>{{ d.version }}</td><td>{{ stamp(d.status) }}</td><td>{{ stamp(d.trust) }}</td><td class="text-nowrap">{{ d.effective_date }}</td><td>{{ d.chunk_count }}</td>
+  <td>{% if d.security_flags %}<span class="stamp stamp-bad">{{ d.security_flags|length }} flagged</span>{% else %}<span class="muted">-</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="9" class="muted">No documents yet. Upload the Sitara Bank pack from sample_documents/.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

@@ -1,0 +1,17 @@
+# Onboarding stages in order, with the day on which each stage is due.
+stages:
+  - {name: "Day 1", due_day: 1}
+  - {name: "Week 1", due_day: 7}
+  - {name: "Week 2", due_day: 14}
+  - {name: "First 30 Days", due_day: 30}
+  - {name: "First 60 Days", due_day: 60}
+  - {name: "First 90 Days", due_day: 90}
+# Stage used when a clause gives no timing, by document category
+default_stage_by_category:
+  Policy: "Week 1"
+  Handbook: "Week 1"
+  Compliance: "First 30 Days"
+  SOP: "Week 2"
+  Role Description: "Week 2"
+  Process Manual: "First 30 Days"
+  FAQ: "Week 2"

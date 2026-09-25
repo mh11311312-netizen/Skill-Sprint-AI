@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block heading %}Onboarding plans{% endblock %}
+{% block content %}
+<div class="panel">
+<form class="row g-2 filter-bar mx-0" method="get">
+  <div class="col-md-3"><select class="form-select form-select-sm" name="role"><option value="">All roles</option>{% for r in roles %}<option {% if request.args.role == r.name %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><select class="form-select form-select-sm" name="status"><option value="">Any plan status</option>{% for s in ['Generated','Pending Review','Verified','Approved','Rejected','Outdated'] %}<option {% if request.args.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><select class="form-select form-select-sm" name="verification"><option value="">Any verification</option>{% for s in ['Verified','Verified with Warning','Incomplete','Unsupported','Contradictory','Manual Review Required'] %}<option {% if request.args.verification == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><button class="btn btn-outline-primary btn-sm w-100">Filter</button></div>
+</form>
+<div class="table-wrap"><table class="table align-middle">
+<thead><tr><th>Plan</th><th>Employee</th><th>Role</th><th>Created</th><th>Plan status</th><th>Verification</th><th>Coverage</th><th>Traceability</th></tr></thead>
+{% for p in plans %}<tr><td class="text-nowrap"><a class="fw-semibold" href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a></td><td>{{ p.employee_id }}</td><td>{{ p.role }}</td><td>{{ p.created_at|dt }}</td>
+<td>{{ stamp(p.status) }}</td><td>{% if p.validation %}{{ stamp(p.validation.status) }}{% endif %}</td>
+<td>{% if p.validation %}{{ p.validation.scores.coverage }}%{% endif %}</td><td>{% if p.validation %}{{ p.validation.scores.traceability }}%{% endif %}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">No plans. Open an employee and generate one.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

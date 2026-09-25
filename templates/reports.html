@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block heading %}Reports{% endblock %}
+{% block content %}
+<div class="panel"><form class="d-flex gap-2 flex-wrap" method="get">
+  <select class="form-select form-select-sm" style="max-width:280px" name="type">{% for k, label in reports.items() %}<option value="{{ k }}" {% if k == kind %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  <button class="btn btn-sm btn-outline-primary">Show</button>
+  <span class="ms-auto small">Export:
+    <a href="{{ url_for('reports.export', type=kind, fmt='csv') }}">CSV</a> ·
+    <a href="{{ url_for('reports.export', type=kind, fmt='xlsx') }}">Excel</a> ·
+    <a href="{{ url_for('reports.export', type=kind, fmt='pdf') }}">PDF</a></span></form></div>
+<div class="panel"><h2>{{ reports[kind] }} <span class="muted small fw-normal">{{ total }} rows{% if total > 300 %}, first 300 shown{% endif %}</span></h2>
+{% if rows %}<div class="table-wrap"><table class="table table-sm"><thead><tr>{% for c in rows[0].keys() %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+{% for r in rows %}<tr>{% for c, val in r.items() %}<td class="small">{% if c in ('Validation status', 'Plan status', 'Progress status') %}{{ stamp(val) }}{% else %}{{ val|dt }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% else %}<p class="muted m-0">No data for this report yet.</p>{% endif %}</div>
+{% endblock %}

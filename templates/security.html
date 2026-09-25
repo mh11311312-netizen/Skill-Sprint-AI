@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block heading %}Security and adversarial content{% endblock %}
+{% block subheading %}<p class="sub">Uploaded text is treated as data. Instruction-like or hidden text is quarantined and never reaches the GenAI model.</p>{% endblock %}
+{% block content %}
+<div class="panel"><h2>Untrusted or suspicious documents</h2><table class="table"><thead><tr><th>Document</th><th>Category</th><th>Trust</th><th>Flags</th></tr></thead>
+{% for d in docs %}<tr><td><a href="{{ url_for('documents.detail', doc_key=d.doc_key) }}">{{ d.document_id }}</a> {{ d.title }}</td><td>{{ d.category }}</td><td>{{ stamp(d.trust) }}</td>
+<td class="small">{% for f in d.security_flags %}§{{ f.section_id }}: {{ f.types|join(', ') }}<br>{% endfor %}</td></tr>{% endfor %}</table></div>
+<div class="panel"><h2>Quarantined clauses ({{ quarantined|length }})</h2>{% for c in quarantined %}<div class="clause q small"><span class="clause-id">{{ c.document_id }} §{{ c.section_id }}</span>{{ c.text }}<div class="muted">{{ c.injection_flags|join(', ') }}</div></div>{% endfor %}</div>
+<div class="panel"><h2>Security events</h2><div class="table-wrap"><table class="table table-sm"><thead><tr><th>At</th><th>Event</th><th>Severity</th><th>Detail</th><th>User</th></tr></thead>
+{% for e in events %}<tr><td>{{ e.at|dt }}</td><td>{{ e.event }}</td><td>{{ stamp(e.severity) }}</td><td class="small">{{ e.detail }}</td><td>{{ e.user }}</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

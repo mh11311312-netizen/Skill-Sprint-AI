@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in | SkillSprint AI</title>
+<link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet"></head>
+<body>
+<div class="login-page">
+  <section class="login-brand">
+    <div class="d-flex align-items-center gap-2"><span class="brand-mark" style="background:#1b3358"><i class="bi bi-stars"></i></span>
+      <b class="text-white fs-5">SkillSprint AI</b></div>
+    <div>
+      <h1>Onboarding that shows where every rule came from.</h1>
+      <p>Personalised learning plans for Sitara Bank employees, generated from approved company documents and checked line by line before anyone relies on them.</p>
+      <ul class="login-points">
+        <li><i class="bi bi-check2-circle"></i><span>Role-based plans with modules, tasks and quizzes</span></li>
+        <li><i class="bi bi-check2-circle"></i><span>Independent Python validation of every AI output</span></li>
+        <li><i class="bi bi-check2-circle"></i><span>Source citations down to the document section</span></li>
+      </ul>
+    </div>
+    <small class="opacity-75">Sitara Bank Ltd. · Karachi</small>
+  </section>
+  <section class="login-form">
+    <div class="login-card">
+      <h2>Welcome back</h2>
+      <p class="muted mb-4">Log in to continue to your workspace.</p>
+      {% with msgs = get_flashed_messages(with_categories=true) %}{% for c, m in msgs %}<div class="alert alert-{{ c }} py-2">{{ m }}</div>{% endfor %}{% endwith %}
+      <form method="post">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <label class="form-label" for="u">Username</label>
+        <input id="u" name="username" class="form-control form-control-lg mb-3" autocomplete="username" required>
+        <label class="form-label" for="p">Password</label>
+        <input id="p" name="password" type="password" class="form-control form-control-lg mb-4" autocomplete="current-password" required>
+        <button class="btn btn-primary btn-lg w-100">Log in</button>
+      </form>
+    </div>
+  </section>
+</div>
+</body></html>

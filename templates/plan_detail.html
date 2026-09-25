@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set v = plan.validation %}
+{% block heading %}{{ plan.plan_id }}{% endblock %}
+{% block subheading %}<p class="sub">{{ plan.role }} · {{ employee.full_name if employee else plan.employee_id }} · {{ plan.experience_level }} ·
+generated {{ plan.generation.generated_at|dt }} with {{ plan.generation.model }}, prompt {{ plan.generation.prompt_template }} v{{ plan.generation.prompt_version }}</p>{% endblock %}
+{% block content %}
+{% if plan.outdated %}<div class="alert alert-warning small"><b>Outdated:</b> {{ plan.outdated.document_id }} changed from v{{ plan.outdated.old_version }} to v{{ plan.outdated.new_version }}
+(sections {{ plan.outdated.changed_sections|join(', ') }}). Affected modules: {{ plan.outdated.modules|join(', ') }}; questions: {{ plan.outdated.questions|join(', ') or 'none' }}.
+<form method="post" action="{{ url_for('plans.regenerate', plan_id=plan.plan_id) }}" class="d-inline">{{ csrf() }}
+<input type="hidden" name="reason" value="Policy update {{ plan.outdated.document_id }} v{{ plan.outdated.new_version }}">
+{% for m in plan.outdated.modules %}<input type="hidden" name="module_ids" value="{{ m }}">{% endfor %}
+<button class="btn btn-sm btn-warning ms-2">Regenerate affected modules only</button></form></div>{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-3"><div class="panel h-100"><div class="small fw-bold muted mb-2">Plan status</div>{{ stamp(plan.status, 'lg') }}
+    <div class="small fw-bold muted mt-3 mb-2">Python verification</div>{% if v %}{{ stamp(v.status, 'lg') }}{% else %}<span class="muted">not validated</span>{% endif %}
+    <form method="post" action="{{ url_for('plans.validate', plan_id=plan.plan_id) }}" class="mt-3">{{ csrf() }}<button class="btn btn-sm btn-outline-primary"><i class="bi bi-check2-square"></i>Run Python validation</button></form>
+    <a class="small d-block mt-2 fw-semibold" href="{{ url_for('plans.download_json', plan_id=plan.plan_id) }}"><i class="bi bi-download"></i> Download GenAI JSON</a></div></div>
+  {% if v %}<div class="col-lg-9"><div class="panel h-100"><div class="row g-3">
+    <div class="col-6 col-md-3">{{ mini(v.scores.coverage ~ '%', 'mandatory coverage (' ~ v.scores.mandatory_covered ~ '/' ~ v.scores.mandatory_expected ~ ')', v.scores.coverage < 100) }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.traceability ~ '%', 'source traceability', v.scores.traceability < 100) }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.requirement_consistency ~ '%', 'requirement consistency') }}</div>
+    <div class="col-6 col-md-3">{{ mini(plan.consistency.consistency_score ~ '%' if plan.consistency else '-', 'generation consistency') }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.missing_count, 'missing requirements', v.scores.missing_count) }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.unsupported_count, 'unsupported requirements', v.scores.unsupported_count) }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.contradiction_count, 'contradictions', v.scores.contradiction_count) }}</div>
+    <div class="col-6 col-md-3">{{ mini(v.scores.hallucination_flags, 'hallucination flags', v.scores.hallucination_flags) }}</div>
+  </div></div></div>{% endif %}
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-modules" type="button">Modules ({{ plan.plan_json.modules|length }})</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#comparison" type="button">GenAI vs Python</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-issues" type="button">Flags ({{ v.issues|length if v else 0 }})</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-review" type="button">Review</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#consistency" type="button">Consistency</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-gen" type="button">Generation log</button></li>
+</ul>
+<div class="tab-content">
+<div class="tab-pane fade show active" id="t-modules">
+  {% if plan.plan_json.insufficient_information %}<div class="alert alert-info small"><b>Model reported missing information:</b> {{ plan.plan_json.insufficient_information|join('; ') }}</div>{% endif %}
+  {% for m in plan.plan_json.modules|by_stage %}
+  <div class="module-card">
+    <div class="d-flex justify-content-between flex-wrap gap-2"><div><span class="stage-label">{{ m.stage }}</span>
+      <h3 class="h6 m-0">{{ m.module_id }} · {{ m.module_title }}</h3>
+      <div class="small muted">{{ m.category }} · {{ 'Mandatory' if m.mandatory else 'Optional' }} · {{ m.priority }} priority · {{ m.difficulty }} · {{ m.estimated_duration_minutes }} min{% if m.prerequisites %} · after {{ m.prerequisites|join(', ') }}{% endif %}</div></div>
+      {% if plan.outdated and m.module_id in plan.outdated.modules %}<span class="stamp stamp-warn">Affected by policy update</span>{% endif %}</div>
+    <p class="small mt-2 mb-1">{{ m.purpose }}</p>
+    <details><summary class="small">Objectives, requirements, checklist, tasks, quiz and assessment</summary>
+      <div class="row mt-2"><div class="col-md-6"><b class="small">Learning objectives</b><ul class="small">{% for o in m.learning_objectives %}<li>{{ o }}</li>{% endfor %}</ul>
+      <b class="small">Key concepts</b><p class="small">{{ m.key_concepts|join(', ') }}</p><b class="small">Completion criteria</b><p class="small">{{ m.completion_criteria }}</p></div>
+      <div class="col-md-6"><b class="small">Requirements covered</b>{% for rc in m.requirements_covered %}<div class="small mb-1">{{ src(rc.source_document_id, rc.source_section_id) }} {{ 'M' if rc.mandatory else 'O' }} · {{ rc.due_stage }} - {{ rc.statement }}</div>{% endfor %}</div></div>
+      <b class="small">Checklist</b><table class="table table-sm"><tr><th>Activity</th><th>Required</th><th>Due</th><th>Responsible</th><th>Source</th></tr>
+      {% for c in m.checklist %}<tr><td>{{ c.activity }}</td><td>{{ 'Yes' if c.required else 'No' }}</td><td>{{ c.due_stage }}</td><td>{{ c.responsible }}</td><td>{{ src(c.source_document_id, c.source_section_id) }}</td></tr>{% endfor %}</table>
+      <b class="small">Tasks</b><table class="table table-sm"><tr><th>Task</th><th>Expected outcome</th><th>Criteria</th><th>Level</th><th>Due</th><th>Source</th></tr>
+      {% for t in m.tasks %}<tr><td>{% if t.scenario_based %}<span class="stamp stamp-info">Scenario</span> {% endif %}{{ t.description }}</td><td>{{ t.expected_outcome }}</td><td>{{ t.completion_criteria }}</td><td>{{ t.difficulty }}</td><td>{{ t.due_stage }}</td><td>{{ src(t.source_document_id, t.source_section_id) }}</td></tr>{% endfor %}</table>
+      <b class="small">Quiz</b>{% for q in m.quiz %}<div class="small mb-2"><b>{{ q.question_id }}</b> ({{ q.type }}, {{ q.difficulty }}) {{ q.question }} {{ src(q.source_document_id, q.source_section_id) }}
+        <ul class="mb-0">{% for o in q.options %}<li {% if o in q.correct_answers %}class="fw-bold text-success"{% endif %}>{{ o }}</li>{% endfor %}</ul><span class="muted">{{ q.explanation }}</span></div>{% endfor %}
+      {% if m.assessment %}<b class="small">Assessment - {{ m.assessment.type }}: {{ m.assessment.topic }}</b>
+      {% if m.assessment.rubric %}<table class="table table-sm"><tr><th>Criterion</th><th>Weight</th><th>Expected performance</th><th>Pass condition</th></tr>{% for r in m.assessment.rubric %}<tr><td>{{ r.criterion }}</td><td>{{ r.weight }}</td><td>{{ r.expected_performance }}</td><td>{{ r.pass_condition }}</td></tr>{% endfor %}</table>{% endif %}{% endif %}
+      {% if current_role in ('admin','reviewer','training_manager') %}
+      <details class="mt-2"><summary class="small">Edit this module (JSON, schema-checked)</summary>
+      <form method="post" action="{{ url_for('plans.edit_module', plan_id=plan.plan_id, module_id=m.module_id) }}">{{ csrf() }}
+        <textarea class="form-control font-monospace small" rows="12" name="module_json">{{ m|tojson(indent=1) }}</textarea>
+        <input class="form-control form-control-sm mt-1" name="comment" placeholder="Reason for edit"><button class="btn btn-sm btn-primary mt-1">Save and re-validate</button></form></details>{% endif %}
+    </details>
+  </div>{% endfor %}
+</div>
+
+<div class="tab-pane fade" id="comparison">{% if v %}
+  <div class="mb-2">{% for k, n in v.status_counts.items() %}<span class="{{ k|status_class }} me-1">{{ k }}: {{ n }}</span>{% endfor %}</div>
+  <div class="table-wrap"><table class="table align-middle">
+  <thead><tr><th>Requirement</th><th>Python expected (ground truth)</th><th>GenAI result</th><th>Source check</th><th>Status</th><th>Explanation</th>{% if current_role in ('admin','reviewer','training_manager') %}<th>Override</th>{% endif %}</tr></thead>
+  {% for r in v.rows %}<tr><td class="fw-bold text-nowrap">{{ r.requirement_id }}{% if r.module_id %}<div class="small muted fw-normal">Module {{ r.module_id }}</div>{% endif %}</td>
+  <td class="small">{% if r.python %}<b>{{ 'Mandatory' if r.python.mandatory else 'Optional' }}</b> · {{ r.python.due_stage }}<div class="mt-1"><span class="src">{{ r.python.source }}</span></div>{% else %}<span class="muted">Not in matrix</span>{% endif %}</td>
+  <td class="small">{% if r.genai %}<b>{{ 'Mandatory' if r.genai.mandatory else 'Optional' }}</b> · {{ r.genai.due_stage }}<div class="mt-1"><span class="src">{{ r.genai.source }}</span></div>{% else %}<span class="muted">Not generated</span>{% endif %}</td>
+  <td>{{ stamp(r.source_check) }}{% if r.support is not none %}<div class="small muted mt-1">support {{ r.support }}</div>{% endif %}</td>
+  <td>{{ stamp(r.status) }}{% if r.original_status %}<div class="small muted mt-1">was {{ r.original_status }}</div>{% endif %}</td><td class="small" style="min-width:14rem">{{ r.explanation or '-' }}</td>
+  {% if current_role in ('admin','reviewer','training_manager') %}<td><details><summary>Override</summary>
+    <form method="post" action="{{ url_for('plans.item_override', plan_id=plan.plan_id) }}" class="d-grid gap-1" style="width:13rem">{{ csrf() }}
+    <input type="hidden" name="requirement_id" value="{{ r.requirement_id }}"><select name="new_status" class="form-select form-select-sm">
+    {% for st in ['Verified','Verified with Warning','Manual Review Required','Unsupported Requirement'] %}<option>{{ st }}</option>{% endfor %}</select>
+    <input name="comment" class="form-control form-control-sm" placeholder="Reason (required)" required><button class="btn btn-sm btn-primary">Save override</button></form></details></td>{% endif %}</tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">Run validation first.</p>{% endif %}</div>
+
+<div class="tab-pane fade" id="t-issues">{% if v and v.issues %}<table class="table"><thead><tr><th>Kind</th><th>Severity</th><th>Where</th><th>Message</th></tr></thead>
+  {% for i in v.issues %}<tr><td>{{ i.kind }}</td><td>{{ stamp(i.severity) }}</td><td class="small">{{ i.where }}</td><td class="small">{{ i.message }}</td></tr>{% endfor %}</table>{% else %}<p class="muted">No item-level flags.</p>{% endif %}</div>
+
+<div class="tab-pane fade" id="t-review"><div class="row g-3"><div class="col-lg-6"><div class="panel"><h2>Reviewer decision</h2>
+  {% if current_role in ('admin','reviewer','training_manager') %}
+  <form method="post" action="{{ url_for('plans.review', plan_id=plan.plan_id) }}">{{ csrf() }}
+    <textarea class="form-control mb-2" name="comment" rows="3" placeholder="Comment (required when approving a plan that is not Verified - this is recorded as an override)"></textarea>
+    <button class="btn btn-primary btn-sm" name="action" value="approve">Approve</button>
+    <button class="btn btn-outline-danger btn-sm" name="action" value="reject">Reject</button>
+    <button class="btn btn-outline-primary btn-sm" name="action" value="comment">Add comment</button></form>
+  <h3 class="h6 mt-3">Regenerate selected modules</h3>
+  <form method="post" action="{{ url_for('plans.regenerate', plan_id=plan.plan_id) }}">{{ csrf() }}
+    {% for m in plan.plan_json.modules %}<label class="me-2 small"><input type="checkbox" name="module_ids" value="{{ m.module_id }}"> {{ m.module_id }}</label>{% endfor %}
+    <input class="form-control form-control-sm my-1" name="reason" placeholder="Reason"><button class="btn btn-sm btn-outline-primary">Regenerate</button></form>
+  {% else %}<p class="muted">Only reviewers can decide.</p>{% endif %}</div></div>
+  <div class="col-lg-6"><div class="panel"><h2>Comments and overrides</h2>
+  {% for c in plan.comments %}<div class="small mb-1"><b>{{ c.by }}</b> {{ c.at|dt }}: {{ c.text }}</div>{% endfor %}
+  {% for o in plan.overrides %}<div class="small mb-1"><span class="stamp stamp-warn">Override</span> <b>{{ o.by }}</b> {{ o.at|dt }}: {{ o.get('requirement_id', 'plan') }} {{ o.get('original_status') or o.get('original_validation_status') }} → {{ o.decision }} - {{ o.comment }}</div>{% endfor %}
+  <h3 class="h6 mt-3">Audit trail</h3>{% for a in audit %}<div class="small">{{ a.at|dt }} · {{ a.user }} · {{ a.action }} {% if a.comment %}- {{ a.comment }}{% endif %}</div>{% endfor %}</div></div></div></div>
+
+<div class="tab-pane fade" id="consistency"><div class="panel"><h2>GenAI consistency check</h2>
+  <p class="small muted">Runs the same structured generation again with the same prompt version and temperature, then compares mandatory requirements, sources, module categories, stages and assessment topics (not wording).</p>
+  {% if current_role in ('admin','training_manager') %}<form method="post" action="{{ url_for('plans.consistency', plan_id=plan.plan_id) }}">{{ csrf() }}<button class="btn btn-sm btn-outline-primary">Run consistency check</button></form>{% endif %}
+  {% if plan.consistency %}{% set c = plan.consistency %}<p class="mt-3">Score <b>{{ c.consistency_score }}%</b> {% if c.major_difference %}<span class="stamp stamp-bad">Major difference</span>{% endif %}</p>
+  <table class="table">{% for k, s in c.scores.items() %}<tr><td>{{ k.replace('_',' ') }}</td><td>{{ s }}%</td></tr>{% endfor %}</table>
+  <p class="small">Only in first run: {{ c.differences.only_in_run_1|join(', ') or '-' }}<br>Only in second run: {{ c.differences.only_in_run_2|join(', ') or '-' }}</p>{% endif %}</div></div>
+
+<div class="tab-pane fade" id="t-gen"><div class="panel"><h2>Generation metadata</h2>
+  <table class="table"><tr><td>Model</td><td>{{ plan.generation.model }}</td></tr><tr><td>Prompt</td><td>{{ plan.generation.prompt_template }} v{{ plan.generation.prompt_version }}</td></tr>
+  <tr><td>Temperature</td><td>{{ plan.generation.temperature }}</td></tr><tr><td>Attempts</td><td>{{ plan.generation.attempts }}</td></tr>
+  <tr><td>Source clauses sent</td><td>{{ plan.generation.source_clause_count }}</td></tr>
+  <tr><td>Source versions</td><td class="small">{% for d, ver in plan.generation.source_versions.items() %}{{ d }} v{{ ver }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr></table>
+  <h3 class="h6">API attempts</h3><table class="table table-sm"><tr><th>At</th><th>Purpose</th><th>Attempt</th><th>OK</th><th>Seconds</th><th>Error</th></tr>
+  {% for l in logs %}<tr><td>{{ l.at|dt }}</td><td>{{ l.purpose }}</td><td>{{ l.attempt }}</td><td>{{ stamp('Yes' if l.ok else 'No') }}</td><td>{{ l.seconds }}</td><td class="small">{{ l.error or '' }}</td></tr>{% endfor %}</table></div></div>
+</div>
+{% endblock %}

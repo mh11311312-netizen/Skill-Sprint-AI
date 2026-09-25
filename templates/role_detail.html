@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block heading %}{{ role.name }}{% endblock %}
+{% block subheading %}<p class="sub">{{ role.department }} · {{ role.description }}</p>{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-3">{{ metric(reqs|length, "Requirements in matrix", icon='table') }}</div>
+  <div class="col-md-3">{{ metric(reqs|selectattr('obligation','equalto','Mandatory')|list|length, "Mandatory", icon='list-check') }}</div>
+  <div class="col-md-3">{{ metric(reqs|selectattr('role_scope','equalto','Role-Specific')|list|length, "Role-specific", icon='person-badge') }}</div>
+  <div class="col-md-3">{{ metric(emps|length, "Employees", icon='people') }}</div>
+</div>
+<div class="row g-3">
+<div class="col-lg-9"><div class="panel"><h2>Role Requirement Matrix</h2><div class="table-wrap"><table class="table">
+<thead><tr><th>Requirement</th><th>Text</th><th>Obligation</th><th>Stage</th><th>Priority</th><th>Assessment</th><th>Prereq.</th></tr></thead>
+{% for r in reqs %}<tr><td><a class="src" href="{{ url_for('documents.detail', doc_key=r.document_id ~ '@' ~ r.version) }}#s{{ r.section_id }}">{{ r.requirement_id }}</a></td>
+<td>{{ r.text }}</td><td>{{ stamp(r.obligation) }}</td><td>{{ r.due_stage }}</td><td>{{ r.priority }}</td><td>{{ r.assessment }}</td><td class="small">{{ r.prerequisites|join(', ') }}</td></tr>{% endfor %}
+</table></div></div></div>
+<div class="col-lg-3">
+  <div class="panel"><h2>By stage</h2><table class="table">{% for k, v in by_stage.items() %}<tr><td>{{ k }}</td><td class="text-end">{{ v }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>By document</h2><table class="table">{% for k, v in by_doc.items()|sort %}<tr><td>{{ k }}</td><td class="text-end">{{ v }}</td></tr>{% endfor %}</table></div>
+  <div class="panel"><h2>Plans</h2>{% for p in plans %}<div class="small"><a href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a> {{ stamp(p.status) }}</div>{% else %}<p class="muted small m-0">No plans yet.</p>{% endfor %}</div>
+</div></div>
+{% endblock %}

@@ -1,0 +1,16 @@
+﻿employee_id,full_name,role_id,role,department,experience_level,location,joining_date,reporting_manager,previous_experience,training_status
+EMP-001,Ayesha Siddiqui,ROLE-01,Branch Manager,Retail Banking,Advanced,Karachi - Clifton,2026-09-01,Regional Head South,8 years in retail banking,Not Started
+EMP-002,Bilal Ahmed,ROLE-02,Customer Service Officer,Customer Service,Beginner,Karachi - Saddar,2026-09-15,Ayesha Siddiqui,Fresh graduate,Not Started
+EMP-003,Hira Khan,ROLE-03,Sales Executive,Retail Banking,Beginner,Lahore - Gulberg,2026-09-08,Usman Tariq,1 year telecom sales,Not Started
+EMP-004,Fahad Qureshi,ROLE-04,HR Executive,Human Resources,Intermediate,Karachi - Head Office,2026-08-25,Head of HR,3 years HR generalist,Not Started
+EMP-005,Sana Malik,ROLE-05,Finance Associate,Finance,Intermediate,Karachi - Head Office,2026-09-01,Finance Manager,2 years audit firm,Not Started
+EMP-006,Kamran Ali,ROLE-06,Operations Coordinator,Operations,Intermediate,Islamabad - Blue Area,2026-09-10,Operations Manager North,4 years back-office operations,Not Started
+EMP-007,Zainab Raza,ROLE-07,IT Support Engineer,Information Technology,Intermediate,Karachi - Head Office,2026-09-03,IT Service Manager,2 years helpdesk,Not Started
+EMP-008,Omar Farooq,ROLE-08,Compliance Officer,Compliance,Advanced,Karachi - Head Office,2026-08-18,Head of Compliance,6 years AML compliance,Not Started
+EMP-009,Maryam Iqbal,ROLE-09,Marketing Executive,Marketing,Intermediate,Lahore - Head Office Annex,2026-09-12,Head of Marketing,3 years digital marketing,Not Started
+EMP-010,Hamza Shaikh,ROLE-10,Data Analyst,Data and Analytics,Intermediate,Karachi - Head Office,2026-09-05,Head of Data and Analytics,2 years BI reporting,Not Started
+EMP-011,Nida Hussain,ROLE-11,Cash Teller,Retail Banking,Beginner,Karachi - Clifton,2026-09-15,Ayesha Siddiqui,Fresh graduate,Not Started
+EMP-012,Asad Mehmood,ROLE-12,Team Leader,Operations,Advanced,Karachi - Head Office,2026-09-02,Operations Manager South,5 years team supervision,Not Started
+EMP-013,Rabia Anwar,ROLE-11,Cash Teller,Retail Banking,Intermediate,Lahore - Gulberg,2026-09-20,Usman Tariq,2 years teller at another bank,Not Started
+EMP-014,Usman Tariq,ROLE-01,Branch Manager,Retail Banking,Advanced,Lahore - Gulberg,2026-08-11,Regional Head Central,10 years banking,Not Started
+EMP-015,Mehwish Javed,ROLE-02,Customer Service Officer,Customer Service,Intermediate,Islamabad - Blue Area,2026-09-18,Kamran Ali,3 years call centre,Not Started

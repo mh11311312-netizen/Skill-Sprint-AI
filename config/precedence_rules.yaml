@@ -1,0 +1,20 @@
+# Document precedence. Lower level = higher authority. Change here, no code change needed.
+precedence_levels:
+  Policy: 1
+  Compliance: 2
+  SOP: 3
+  Handbook: 4
+  Role Description: 5
+  Process Manual: 6
+  FAQ: 7
+  Guideline: 8
+  Informal Guidance: 8
+# Categories that can never create or override requirements (routed to manual review instead)
+untrusted_categories: [Guideline, Informal Guidance]
+untrusted_owners: [Unknown, "", None]
+rules:
+  - Only the Active version of a document is used; superseded versions are ignored.
+  - When two active sources conflict, the lower precedence level wins.
+  - At the same level, the later effective date wins.
+  - A rule for a specific role or module applies within its own scope.
+  - Unresolved conflicts are marked Manual Review Required.
