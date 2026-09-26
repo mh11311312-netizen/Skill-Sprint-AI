@@ -1,3 +1,4 @@
+"""SkillSprint AI - Flask application entry point.  Run:  python app.py"""
 import os
 from flask import Flask, render_template, session
 from config.settings import Config
@@ -21,8 +22,16 @@ def create_app(overrides=None):
 
     @app.context_processor
     def inject_user():
+        # pending_reviews is display-only (header bell + sidebar badge); it does not change any logic
+        pending = 0
+        if session.get("app_role") in ("admin", "training_manager", "reviewer", "manager"):
+            try:
+                from database.db import get_db
+                pending = get_db().plans.count_documents({"status": {"$in": ["Pending Review", "Outdated", "Generated"]}})
+            except Exception:
+                pending = 0
         return {"current_user": session.get("username"), "current_role": session.get("app_role"),
-                "current_employee": session.get("employee_id")}
+                "current_employee": session.get("employee_id"), "pending_reviews": pending}
 
     @app.errorhandler(403)
     def forbidden(e):

@@ -1,57 +1,175 @@
 {% extends "base.html" %}
 {% block heading %}Dashboard{% endblock %}
-{% block subheading %}<p class="sub">Sources, requirements, plans and compliance coverage at a glance.</p>{% endblock %}
+{% block subheading %}<p class="sub">Workspace overview</p>{% endblock %}
+
+{% macro sparkline(values, uid) -%}
+  {% set peak = values|max %}{% set n = values|length %}
+  {% set pts = [] %}
+  {% for v in values %}{% set x = (100 * loop.index0 / (n - 1))|round(2) %}{% set y = (28 - (22 * v / peak if peak else 0))|round(2) %}{% set _ = pts.append(x ~ ',' ~ y) %}{% endfor %}
+  <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" role="img" aria-label="Daily trend over 14 days, peak {{ peak }}">
+    <defs><linearGradient id="sg-{{ uid }}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1e3d2" stop-opacity=".28"/><stop offset="1" stop-color="#f1e3d2" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="0,30 {{ pts|join(' ') }} 100,30" fill="url(#sg-{{ uid }})"/>
+    <polyline points="{{ pts|join(' ') }}" fill="none" stroke="#efe2d2" stroke-width="1.4" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+  </svg>
+{%- endmacro %}
+
+{% macro gauge(p, text, label) -%}
+  {% set full = 131.95 %}{% set part = (full * ([p, 100]|min) / 100)|round(2) %}
+  <div class="gauge">
+    <svg viewBox="0 0 80 72" role="img" aria-label="{{ label }} {{ text }}">
+      <circle cx="40" cy="38" r="28" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="7" stroke-linecap="round" stroke-dasharray="{{ full }} 200" transform="rotate(135 40 38)"/>
+      <circle cx="40" cy="38" r="28" fill="none" stroke="#fbf3e9" stroke-width="7" stroke-linecap="round" stroke-dasharray="{{ part }} 200" transform="rotate(135 40 38)"/>
+      <text x="40" y="44" text-anchor="middle" class="g-v">{{ text }}</text>
+    </svg>
+    <div class="g-l">{{ label }}</div>
+  </div>
+{%- endmacro %}
+
 {% block content %}
-<div class="row g-3 mb-4">
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.documents_active, "Active documents", icon='file-earmark-text') }}</div>
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.mandatory, "Mandatory requirements", icon='list-check') }}</div>
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.employees, "Employees", icon='people') }}</div>
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.avg_coverage ~ "%", "Average coverage", icon='bullseye', good=stats.avg_coverage >= 95) }}</div>
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.avg_traceability ~ "%", "Average traceability", icon='link-45deg', good=stats.avg_traceability >= 95) }}</div>
-  <div class="col-sm-6 col-xl-2">{{ metric(stats.pending_review, "Plans need review", stats.pending_review > 0, icon='inbox') }}</div>
-</div>
-<div class="row g-3 mb-1">
-  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-pie-chart"></i>Plans by status</h2>
-    {% if by_status %}<div style="height:220px"><canvas id="c1" aria-label="Plans by status chart"></canvas></div>{% else %}<p class="muted m-0">No plans generated yet.</p>{% endif %}</div></div>
-  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-activity"></i>Employee progress</h2>
-    <div style="height:220px"><canvas id="c2" aria-label="Employee progress chart"></canvas></div></div></div>
-  <div class="col-lg-4"><div class="panel h-100"><h2><i class="bi bi-heart-pulse"></i>Source health</h2>
-    <table class="table">
-      <tr><td>Superseded versions kept</td><td class="text-end fw-bold">{{ stats.documents_superseded }}</td></tr>
-      <tr><td>Flagged or untrusted documents</td><td class="text-end fw-bold {% if stats.documents_flagged %}text-danger{% endif %}">{{ stats.documents_flagged }}</td></tr>
-      <tr><td>Source conflicts resolved</td><td class="text-end fw-bold">{{ stats.conflicts }}</td></tr>
-      <tr><td>Security events</td><td class="text-end fw-bold">{{ stats.security_events }}</td></tr>
-      <tr><td>Active requirements</td><td class="text-end fw-bold">{{ stats.requirements }}</td></tr>
-    </table>
-    <a class="d-inline-block mt-3 small fw-semibold" href="{{ url_for('admin.security') }}">Open security log <i class="bi bi-chevron-right"></i></a></div></div>
-</div>
+<section class="hero">
+  <div>
+    <div class="eyebrow">Sitara Bank · Workspace overview</div>
+    <h2>{{ greeting }}, {{ current_user }} 👋</h2>
+    <div class="meta"><i class="bi bi-clock" aria-hidden="true"></i>{{ today_label }} · {{ stats.employees }} employees in {{ stats.roles }} roles</div>
+  </div>
+  <div class="hero-right">
+    <div class="gauges">
+      {{ gauge(stats.avg_coverage, (stats.avg_coverage|round|int) ~ '%', 'Avg. coverage') }}
+      {{ gauge(stats.avg_traceability, (stats.avg_traceability|round|int) ~ '%', 'Traceability') }}
+      {{ gauge(100 * health.approved / stats.plans if stats.plans else 0, health.approved, 'Approved plans') }}
+    </div>
+    <div class="hero-buttons">
+      <a class="btn btn-primary" href="{{ url_for('reports.index') }}"><i class="bi bi-graph-up"></i>View reports</a>
+      <a class="btn btn-primary" href="{{ url_for('employees.index') }}"><i class="bi bi-person-plus"></i>Add employee</a>
+    </div>
+  </div>
+</section>
+
 <div class="row g-3">
-  <div class="col-xl-7"><div class="panel"><h2><i class="bi bi-person-badge"></i>Roles</h2>
-    <div class="table-wrap"><table class="table align-middle">
-      <thead><tr><th>Role</th><th class="text-end">Mandatory</th><th class="text-end">Employees</th><th class="text-end">Coverage</th><th style="width:28%">Progress</th></tr></thead>
-      <tbody>{% for r in role_stats %}<tr><td><a class="fw-semibold" href="{{ url_for('roles.detail', name=r.role) }}">{{ r.role }}</a></td><td class="text-end">{{ r.mandatory }}</td>
-      <td class="text-end">{{ r.employees }}</td><td class="text-end">{% if r.coverage is not none %}{{ r.coverage }}%{% else %}<span class="muted">-</span>{% endif %}</td>
-      <td><div class="d-flex align-items-center gap-2"><div class="progress flex-grow-1" role="progressbar" aria-valuenow="{{ r.progress }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ r.progress }}%"></div></div><span class="small muted" style="width:3rem">{{ r.progress }}%</span></div></td></tr>{% endfor %}</tbody>
-    </table></div></div></div>
-  <div class="col-xl-5"><div class="panel"><h2><i class="bi bi-flag"></i>Plans needing attention</h2>
-    {% if flagged %}<div class="table-wrap"><table class="table align-middle"><thead><tr><th>Plan</th><th>Validation</th><th class="text-end">Coverage</th></tr></thead><tbody>
-    {% for p in flagged %}<tr><td><a class="fw-semibold" href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.employee_id }}</a><div class="small muted">{{ p.role }}</div></td>
-    <td>{{ stamp(p.validation.status) }}</td><td class="text-end">{{ p.validation.scores.coverage }}%</td></tr>{% endfor %}</tbody></table></div>
-    {% else %}<p class="muted m-0">Nothing needs attention right now.</p>{% endif %}</div></div>
+  <div class="col-6 col-xl-3"><div class="metric">
+    <span class="badge-tr pill-soft pill-green">+{{ week.employees }} this week</span>
+    <div class="metric-icon"><i class="bi bi-people"></i></div>
+    <div class="v">{{ stats.employees }}</div><div class="l">Total employees</div>
+    {{ sparkline(spark.employees, 'emp') }}</div></div>
+  <div class="col-6 col-xl-3"><div class="metric">
+    <span class="badge-tr pill-soft pill-green">+{{ week.approved }} this week</span>
+    <div class="metric-icon"><i class="bi bi-patch-check"></i></div>
+    <div class="v">{{ health.approved }}</div><div class="l">Approved plans ({{ (100 * health.approved / stats.plans)|round|int if stats.plans else 0 }}%)</div>
+    {{ sparkline(spark.approved, 'appr') }}</div></div>
+  <div class="col-6 col-xl-3"><div class="metric {% if stats.pending_review %}pending{% endif %}">
+    <span class="badge-tr pill-soft pill-grey">{{ week.plans }} generated this week</span>
+    <div class="metric-icon"><i class="bi bi-bell"></i></div>
+    <div class="v">{{ stats.pending_review }}</div><div class="l">Plans need review</div>
+    {{ sparkline(spark.plans, 'plans') }}</div></div>
+  <div class="col-6 col-xl-3"><div class="metric">
+    <span class="badge-tr pill-soft pill-grey">+{{ week.docs }} this week</span>
+    <div class="metric-icon"><i class="bi bi-file-earmark-text"></i></div>
+    <div class="v">{{ stats.documents_active }}</div><div class="l">Active documents</div>
+    {{ sparkline(spark.docs, 'docs') }}</div></div>
 </div>
-{% endblock %}
-{% block scripts %}
-<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<script>
-Chart.defaults.font.family = '"Jakarta", "Segoe UI", sans-serif';
-Chart.defaults.color = '#5d6b82';
-const colours = {'Approved':'#157347','Verified':'#157347','Completed':'#157347','On Track':'#2457d6',
-  'Pending Review':'#e0a526','Generated':'#6f8fd8','Assessment Required':'#e0a526','Outdated':'#a15c00',
-  'Rejected':'#c0322b','Behind Schedule':'#c0322b','Requires Attention':'#c0322b','Not Started':'#c9d3e0'};
-function donut(id, data){ const el = document.getElementById(id); if (!el) return; const labels = Object.keys(data);
-  new Chart(el, {type:'doughnut', data:{labels, datasets:[{data:Object.values(data), borderWidth:2, borderColor:'#fff',
-    backgroundColor:labels.map(l => colours[l] || '#8a97ab')}]},
-    options:{maintainAspectRatio:false, cutout:'68%', plugins:{legend:{position:'right', labels:{boxWidth:10, boxHeight:10, padding:12}}}}}); }
-donut('c1', {{ by_status|tojson }}); donut('c2', {{ training|tojson }});
-</script>
+
+<div class="section-label">Training progress by department</div>
+<div class="row g-3">
+  {% for d in departments[:8] %}
+  <div class="col-6 col-lg-3"><div class="dept-card dept-{{ loop.index0 % 6 }}">
+    <div class="d-top"><span>{{ d.name }}</span><span class="num">{{ d.progress|round|int }}%</span></div>
+    <div class="d-bar"><i style="width: {{ d.progress }}%"></i></div>
+    <div class="d-foot"><span>{{ d.employees }} employee{{ 's' if d.employees != 1 }}</span><b>{{ d.completed }} trained</b></div>
+  </div></div>
+  {% else %}<div class="col-12"><p class="muted small">No employees yet.</p></div>{% endfor %}
+</div>
+
+<div class="section-label">Quick actions</div>
+<div class="row g-3">
+  {% for href, icon, title, sub in [
+      (url_for('documents.index'), 'upload', 'Upload documents', 'Add policies, SOPs and FAQs'),
+      (url_for('employees.index'), 'magic', 'Generate a plan', 'Pick an employee to start'),
+      (url_for('plans.review_queue'), 'inbox', 'Review queue', (stats.pending_review ~ ' plans waiting')),
+      (url_for('admin.security'), 'shield-exclamation', 'Security alerts', (stats.security_events ~ ' events logged'))] %}
+  <div class="col-6 col-lg-3"><a class="action-card" href="{{ href }}">
+    <span class="a-icon"><i class="bi bi-{{ icon }}"></i></span>
+    <span><span class="a-title d-block">{{ title }}</span><span class="a-sub">{{ sub }}</span></span>
+    <i class="bi bi-arrow-right a-go" aria-hidden="true"></i></a></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-7"><div class="panel h-100 mb-0">
+    <div class="panel-head"><h2>Plan generator health</h2><a href="{{ url_for('admin.logs') }}">View details →</a></div>
+    <div class="well brain">
+      <span class="brain-dial"><i class="bi bi-cpu"></i></span>
+      <div class="min-w-0">
+        <div class="brain-title">Sitara Bank plan generator {% if health.last %}<span class="live">Active</span>{% endif %}</div>
+        <div class="small muted">{{ stats.documents_active }} documents · {{ stats.requirements }} requirements · model {{ health.model }}, prompt v{{ health.prompt }}</div>
+        <div class="d-flex align-items-center gap-2 mt-2"><div class="progress flex-grow-1" style="max-width:220px"><div class="progress-bar" style="width: {{ stats.avg_traceability }}%"></div></div>
+          <span class="small">Traceability {{ stats.avg_traceability }}%</span></div>
+      </div>
+      <div class="brain-side">Validated plans<b>{{ health.validated }}</b></div>
+    </div>
+    {% set peak = activity|map(attribute='count')|max %}
+    <div class="d-flex justify-content-between align-items-baseline mt-3"><span class="small">Plans generated this week</span>
+      <span class="small" style="color:#7fd49d">{{ activity|sum(attribute='count') }} total</span></div>
+    {% set pts = [] %}
+    {% for a in activity %}{% set _ = pts.append((50 + loop.index0 * 100) ~ ',' ~ ((100 - 70 * a.count / peak) if peak else 100)|round(1)) %}{% endfor %}
+    <svg class="linechart" viewBox="0 0 700 130" preserveAspectRatio="none" role="img" aria-label="Plans generated per day this week">
+      {% for y in [30, 65, 100] %}<line x1="20" x2="680" y1="{{ y }}" y2="{{ y }}" stroke="rgba(255,238,220,.07)"/>{% endfor %}
+      <polyline points="{{ pts|join(' ') }}" fill="none" stroke="#e8bd63" stroke-width="2" stroke-linejoin="round"/>
+      {% for a in activity %}{% set x = 50 + loop.index0 * 100 %}{% set y = ((100 - 70 * a.count / peak) if peak else 100)|round(1) %}
+        <circle cx="{{ x }}" cy="{{ y }}" r="{{ 6 if a.today else 4 }}" fill="{{ '#fbf3e9' if a.today else '#e8bd63' }}" stroke="#241b16" stroke-width="2"><title>{{ a.date }}: {{ a.count }}</title></circle>
+        <text x="{{ x }}" y="124" text-anchor="middle" font-size="12" fill="#b9a695">{{ a.day }}</text>{% endfor %}
+    </svg>
+  </div></div>
+  <div class="col-lg-5 d-flex flex-column gap-3">
+    <div class="panel mb-0">
+      <div class="panel-head"><h2>Live alerts</h2><a href="{{ url_for('admin.security') }}">View all →</a></div>
+      {% for a in alerts[:3] %}
+      <div class="alert-row" style="--dotc: {{ '#e59a8f' if a.level == 'High' else '#e3c373' }}">
+        <div class="min-w-0"><div class="t"><a class="text-reset" href="{{ a.link }}">{{ a.text }}</a></div><div class="sub">{{ a.sub }}</div></div>
+        <span class="stamp {{ 'stamp-bad' if a.level == 'High' else 'stamp-warn' }}">{{ a.level|upper }}</span>
+      </div>
+      {% else %}<p class="muted small m-0">No alerts.</p>{% endfor %}
+    </div>
+    <div class="panel mb-0 flex-grow-1">
+      <div class="panel-head"><h2>Recent documents</h2><a href="{{ url_for('documents.index') }}">Manage →</a></div>
+      {% for d in recent_docs[:3] %}
+      <div class="doc-row"><span class="doc-ico {{ d.file_type }}">{{ d.file_type }}</span>
+        <div class="min-w-0 flex-grow-1"><a class="n text-reset d-block text-truncate" href="{{ url_for('documents.detail', doc_key=d.doc_key) }}">{{ d.document_id }} · {{ d.title }}</a>
+          <div class="sub">Uploaded {{ d.uploaded_at|dt }} · v{{ d.version }}</div></div>
+        {{ stamp(d.trust) }}</div>
+      {% else %}<p class="muted small m-0">No documents uploaded yet.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="panel mt-3">
+  <div class="panel-head"><h2>Employee training status</h2><a href="{{ url_for('employees.index') }}">View all →</a></div>
+  <div class="table-wrap"><table class="table align-middle">
+    <thead><tr><th>Employee</th><th>Progress</th><th>Status</th><th>Role</th><th>Joined</th></tr></thead>
+    <tbody>{% for e in training_rows %}{% set pct = (e.progress_pct or 0)|round|int %}
+    <tr><td><div class="person"><span class="initials">{{ e.full_name.split(' ')|map('first')|join('')|upper|truncate(2, True, '') }}</span>
+        <div><a class="fw-semibold text-reset" href="{{ url_for('employees.detail', employee_id=e.employee_id) }}">{{ e.full_name }}</a><div><span class="dep-chip">{{ e.department }}</span></div></div></div></td>
+      <td><div class="score"><div class="progress"><div class="progress-bar" style="width: {{ pct }}%"></div></div><span class="num">{{ pct }}%</span></div></td>
+      <td>{{ stamp(e.training_status or 'Not Started') }}</td><td class="small">{{ e.role }}</td><td class="small text-nowrap">{{ e.joining_date }}</td></tr>
+    {% endfor %}</tbody></table></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-8"><div class="panel h-100 mb-0">
+    <div class="panel-head"><h2>Roles</h2><a href="{{ url_for('roles.index') }}">Manage roles →</a></div>
+    <div class="table-wrap"><table class="table align-middle">
+      <thead><tr><th>Role</th><th class="text-end">Mandatory</th><th class="text-end">Employees</th><th class="text-end">Coverage</th><th style="width:24%">Progress</th></tr></thead>
+      <tbody>{% for r in role_stats %}<tr><td><a class="fw-semibold text-reset" href="{{ url_for('roles.detail', name=r.role) }}">{{ r.role }}</a></td>
+      <td class="text-end num">{{ r.mandatory }}</td><td class="text-end num">{{ r.employees }}</td>
+      <td class="text-end num">{% if r.coverage is not none %}{{ r.coverage }}%{% else %}<span class="muted">-</span>{% endif %}</td>
+      <td><div class="d-flex align-items-center gap-2"><div class="progress flex-grow-1"><div class="progress-bar" style="width: {{ r.progress }}%"></div></div><span class="small num" style="width:3rem">{{ r.progress }}%</span></div></td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  <div class="col-xl-4"><div class="panel h-100 mb-0">
+    <div class="panel-head"><h2>Source health</h2><a href="{{ url_for('matrix.conflicts') }}">Conflicts →</a></div>
+    <ul class="health-list">
+      <li><span class="health-state {{ 'bad' if stats.documents_flagged else 'ok' }}"></span><span class="health-label">Flagged or untrusted documents<small>quarantined from generation</small></span><span class="health-value">{{ stats.documents_flagged }}</span></li>
+      <li><span class="health-state {{ 'warn' if stats.conflicts else 'ok' }}"></span><span class="health-label">Source conflicts resolved<small>by precedence rules</small></span><span class="health-value">{{ stats.conflicts }}</span></li>
+      <li><span class="health-state neutral"></span><span class="health-label">Superseded versions kept<small>history only</small></span><span class="health-value">{{ stats.documents_superseded }}</span></li>
+      <li><span class="health-state {{ 'ok' if stats.requirements else 'bad' }}"></span><span class="health-label">Active requirements<small>{{ stats.mandatory }} mandatory</small></span><span class="health-value">{{ stats.requirements }}</span></li>
+    </ul></div></div>
+</div>
 {% endblock %}

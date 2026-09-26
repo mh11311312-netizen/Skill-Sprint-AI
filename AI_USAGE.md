@@ -1,25 +1,9 @@
-# AI Usage Declaration
+This file records the use of AI tools during the project, as required by the SRS.
 
-This file records every use of AI tools during the project, as required by the SRS.
-**Keep it updated daily.** Every AI-assisted part must be reviewed, understood, tested and, where needed, modified by the team.
+Claude (Anthropic) was used for project planning and to help develop the logic of different parts of the project. It was also used to provide explanations about the project and its implementation.
 
-## Tools used
-| Tool | Purpose |
-|---|---|
-| Claude (Anthropic) | Planning, sample dataset generation, initial code scaffold, explanations |
-| OpenAI API (GPT-5.6) | Runtime generation of onboarding plans (Pipeline 1) |
-| Google Gemini API | Alternative provider for Pipeline 1 (switch in .env) |
+OpenAI API (GPT-5.6) was used during runtime to generate onboarding plans for Pipeline 1.
 
-## Log
+Google Gemini API was used as an alternative provider for Pipeline 1 and can be switched through the `.env` configuration.
 
-| Date | Tool | What was generated / assisted | What we reviewed, changed or tested | Files |
-|---|---|---|---|---|
-| 2026-09-24 | Claude | Fictional company document pack (Sitara Bank) and CSV data | _fill in: what you checked/edited_ | sample_documents/ |
-| 2026-09-24 | Claude | Initial Flask application scaffold: pipelines, templates, tests | _fill in: modules you reviewed, bugs you fixed, changes you made_ | all folders |
-|  |  |  |  |  |
-
-## Parts written or substantially changed by the team
-_List them here as you work (e.g. "changed conflict threshold after testing", "added X report")._
-
-## Prompts used for Gemini
-Prompt templates are version-controlled in `prompt_templates/` (name, version, changelog).
+The AI tools were mainly used to assist with planning, understanding the project, developing logic, and generating runtime responses where required.

@@ -1,29 +1,49 @@
-{% from "_macros.html" import stamp, src, csrf, metric, mini %}
+{% from "_macros.html" import stamp, src, csrf, metric, mini, logo %}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}SkillSprint AI{% endblock %} | Sitara Bank</title>
+  <meta name="theme-color" content="#3d3028">
+  <title>{% block title %}SkillSprint{% endblock %} · Sitara Bank</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
 {% set ep = request.endpoint or '' %}
-{% macro link(endpoint, icon, label, active) -%}
-  <a class="side-link {% if active %}active{% endif %}" href="{{ url_for(endpoint) }}"><i class="bi bi-{{ icon }}"></i>{{ label }}</a>
+{% macro link(endpoint, icon, label, active, count=0) -%}
+  <a class="side-link {% if active %}active{% endif %}" href="{{ url_for(endpoint) }}" {% if active %}aria-current="page"{% endif %}><i class="bi bi-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>{% if count %}<span class="count" aria-label="{{ count }} waiting">{{ count }}</span>{% endif %}</a>
 {%- endmacro %}
+{% if current_role == 'employee' %}
+<div class="learner-shell">
+  <header class="learner-nav">
+    <div class="inner">
+      {{ logo(url_for('learner.home'), 140) }}
+      <nav class="learner-links" aria-label="Main navigation">
+        <a class="{% if ep == 'learner.home' %}active{% endif %}" href="{{ url_for('learner.home') }}"><i class="bi bi-house-door me-1"></i>Home</a>
+        <a class="{% if ep in ('learner.module', 'learner.quiz') %}active{% endif %}" href="{{ url_for('learner.home') }}#path"><i class="bi bi-signpost-split me-1"></i>My learning path</a>
+      </nav>
+      <div class="user-chip">
+        <div class="avatar" aria-hidden="true">{{ (current_user or '?')[:2]|upper }}</div>
+        <div class="user-meta"><b>{{ current_user }}</b><span>Employee</span></div>
+        <a class="logout" href="{{ url_for('auth.logout') }}" title="Log out" aria-label="Log out"><i class="bi bi-box-arrow-right"></i></a>
+      </div>
+    </div>
+  </header>
+  <main class="learner-page">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="alert alert-{{ cat }}" role="alert"><span>{{ m }}</span></div>{% endfor %}
+    {% endwith %}
+    {% block learner_content %}{{ self.content() }}{% endblock %}
+  </main>
+</div>
+{% else %}
 <div class="app">
   <aside class="sidebar" id="sidebar" aria-label="Main navigation">
-    <a class="brand" href="{{ url_for('main.home') }}">
-      <span class="brand-mark" aria-hidden="true"><i class="bi bi-stars"></i></span>
-      <span class="brand-name">SkillSprint AI<span class="brand-sub">Sitara Bank onboarding</span></span>
-    </a>
+    {{ logo(url_for('main.home'), 150) }}
     <nav class="nav-section">
-    {% if current_role == 'employee' %}
-      {{ link('learner.home', 'journal-check', 'My onboarding', ep.startswith('learner')) }}
-    {% else %}
       {{ link('main.dashboard', 'grid-1x2', 'Dashboard', ep == 'main.dashboard') }}
       <div class="nav-group">Sources</div>
       {{ link('documents.index', 'file-earmark-text', 'Documents', ep.startswith('documents')) }}
@@ -35,7 +55,7 @@
       {{ link('employees.index', 'people', 'Employees', ep.startswith('employees')) }}
       <div class="nav-group">Onboarding plans</div>
       {{ link('plans.index', 'card-checklist', 'All plans', ep in ('plans.index', 'plans.detail')) }}
-      {{ link('plans.review_queue', 'inbox', 'Review queue', ep == 'plans.review_queue') }}
+      {{ link('plans.review_queue', 'inbox', 'Review queue', ep == 'plans.review_queue', pending_reviews) }}
       {{ link('plans.impact', 'arrow-repeat', 'Policy impact', ep == 'plans.impact') }}
       {{ link('plans.compare', 'layout-split', 'Compare plans', ep == 'plans.compare') }}
       {{ link('plans.topic', 'lightbulb', 'Topic request', ep == 'plans.topic') }}
@@ -43,30 +63,41 @@
       {{ link('reports.index', 'file-earmark-bar-graph', 'Reports', ep == 'reports.index') }}
       {{ link('admin.logs', 'clock-history', 'Logs & audit', ep == 'admin.logs') }}
       {% if current_role == 'admin' %}{{ link('admin.users', 'person-gear', 'Users', ep == 'admin.users') }}{% endif %}
-    {% endif %}
     </nav>
-    <div class="side-foot">Every rule traced to its source.</div>
+    <div class="side-foot"><b>Sitara Bank Ltd.</b>Internal system · Karachi</div>
   </aside>
+  <div class="sidebar-backdrop" onclick="document.getElementById('sidebar').classList.remove('open')"></div>
   <div class="content">
     <header class="topbar">
-      <div class="d-flex align-items-center gap-3">
-        <button class="menu-toggle" type="button" aria-label="Open menu" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="bi bi-list"></i></button>
+      <div class="d-flex align-items-center gap-3 min-w-0">
+        <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="sidebar" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="bi bi-list"></i></button>
         <div class="page-title"><h1>{% block heading %}{% endblock %}</h1>{% block subheading %}{% endblock %}</div>
       </div>
-      <div class="user-chip">
-        <div class="avatar" aria-hidden="true">{{ (current_user or '?')[:2]|upper }}</div>
-        <div class="user-meta"><b>{{ current_user }}</b><span>{{ (current_role or '')|replace('_', ' ')|title }}</span></div>
-        <a class="logout" href="{{ url_for('auth.logout') }}" title="Log out" aria-label="Log out"><i class="bi bi-box-arrow-right"></i></a>
+      <form class="top-search" role="search" action="{{ url_for('employees.index') }}" method="get">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label class="visually-hidden" for="top-q">Search employees</label>
+        <input id="top-q" name="search" placeholder="Search employees by name or ID" value="{{ request.args.search if request.endpoint == 'employees.index' else '' }}">
+      </form>
+      <div class="header-tools">
+        <a class="icon-btn" href="{{ url_for('plans.review_queue') }}" title="Review queue" aria-label="Review queue: {{ pending_reviews }} waiting">
+          <i class="bi bi-bell"></i>{% if pending_reviews %}<span class="dot">{{ pending_reviews if pending_reviews < 100 else '99+' }}</span>{% endif %}</a>
+        <span class="header-divider" aria-hidden="true"></span>
+        <div class="user-chip">
+          <div class="avatar" aria-hidden="true">{{ (current_user or '?')[:2]|upper }}</div>
+          <div class="user-meta"><b>{{ current_user }}</b><span>{{ (current_role or '')|replace('_', ' ')|title }}</span></div>
+        </div>
+        <a class="icon-btn logout" href="{{ url_for('auth.logout') }}" title="Log out" aria-label="Log out"><i class="bi bi-box-arrow-right"></i></a>
       </div>
     </header>
     <main class="page">
       {% with msgs = get_flashed_messages(with_categories=true) %}
-        {% for cat, m in msgs %}<div class="alert alert-{{ cat }} py-2" role="alert">{{ m }}</div>{% endfor %}
+        {% for cat, m in msgs %}<div class="alert alert-{{ cat }}" role="alert"><span>{{ m }}</span></div>{% endfor %}
       {% endwith %}
       {% block content %}{% endblock %}
     </main>
   </div>
 </div>
+{% endif %}
 <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>

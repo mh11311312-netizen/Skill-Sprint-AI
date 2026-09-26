@@ -6,13 +6,24 @@
 {%- endmacro %}
 {% macro csrf() -%}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{%- endmacro %}
 {# Card with icon: used on dashboards #}
-{% macro metric(value, label, alert=False, icon='bar-chart-line', good=False) -%}
-<div class="metric {% if alert %}is-alert{% elif good %}good{% endif %}">
-  <div class="metric-icon"><i class="bi bi-{{ icon }}"></i></div>
-  <div><div class="v">{{ value }}</div><div class="l">{{ label }}</div></div>
+{% macro metric(value, label, alert=False, icon='bar-chart-line', good=False, sub='', pending=False) -%}
+<div class="metric {% if alert %}is-alert{% elif pending %}pending{% elif good %}good{% endif %}">
+  <div class="metric-icon" aria-hidden="true"><i class="bi bi-{{ icon }}"></i></div>
+  <div class="min-w-0"><div class="v">{{ value }}</div><div class="l">{{ label }}</div>{% if sub %}<div class="s">{{ sub }}</div>{% endif %}</div>
 </div>
 {%- endmacro %}
 {# Compact number without a card: used inside panels #}
 {% macro mini(value, label, alert=False) -%}
 <div class="metric-plain {% if alert %}is-alert{% endif %}"><div class="v">{{ value }}</div><div class="l">{{ label }}</div></div>
+{%- endmacro %}
+
+{# SkillSprint wordmark: serif name with a gold swoosh underneath #}
+{% macro logo(href, width=150, sub='Sitara Bank Ltd.', cls='') -%}
+<a class="logo {{ cls }}" href="{{ href }}" aria-label="SkillSprint home">
+  <svg width="{{ width }}" viewBox="0 0 150 40" role="img" aria-hidden="true">
+    <text x="2" y="24" class="logo-word" font-size="24" fill="#f6eee5">SkillSprint</text>
+    <path d="M4 36C40 37.5 88 36 122 28" fill="none" stroke="#e3b562" stroke-width="2.4" stroke-linecap="round"/>
+  </svg>
+  {% if sub %}<span class="logo-sub">{{ sub }}</span>{% endif %}
+</a>
 {%- endmacro %}
