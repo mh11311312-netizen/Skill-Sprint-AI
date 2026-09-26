@@ -1,13 +1,12 @@
-"""Pipeline 1 - GenAI generation.
-Selects the approved source clauses for the role, fills a versioned prompt template, calls the API,
-checks the JSON with Pydantic, retries a limited number of times, and logs every attempt."""
 import json
-import secrets
+import math
 import os
+import secrets
 import re
 import time
 from datetime import datetime
 import yaml
+from concurrent.futures import ThreadPoolExecutor
 from flask import current_app
 from pydantic import ValidationError
 from config.loader import load_yaml
@@ -117,26 +116,202 @@ def call_with_retry(db, system, prompt, model_cls, purpose, request_id):
     raise GenerationFailed(f"Generation failed after {attempt} attempt(s). Last error: {last_error}")
 
 
-# ---------------- plan generation ----------------
-def build_plan_prompt(db, employee):
+# ---------------- plan generation (in batches) ----------------
+# A role can have 80+ mandatory requirements. One huge request makes the model stop early
+# (low coverage). So the approved sources are split into small batches, each batch is sent
+# as a separate request, and the returned modules are merged into one plan.
+
+def _setting(name, default):
+    """Reads a number from the app config or .env (0 is a valid value)."""
+    value = current_app.config.get(name)
+    if value is None:
+        value = os.getenv(name, default)
+    return int(value)
+
+
+def _conflict_groups(db, doc_ids):
+    """Documents that conflict with each other are kept in the same batch, so the model can
+    apply the precedence rules itself (e.g. FAQ-02 and POL-04 are always sent together)."""
+    parent = {d: d for d in doc_ids}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for c in db.conflicts.find({"kind": "conflict"}):
+        a, b = c["a"]["document_id"], c["b"]["document_id"]
+        if a in parent and b in parent:
+            parent[find(a)] = find(b)
+    groups = {}
+    for d in doc_ids:
+        groups.setdefault(find(d), []).append(d)
+    return list(groups.values())
+
+
+def make_batches(db, selected, max_clauses):
+    """Packs (document, clauses) pairs into batches of at most max_clauses clauses."""
+    by_id = {d["document_id"]: (d, rows) for d, rows in selected}
+    groups = _conflict_groups(db, list(by_id))
+    groups.sort(key=lambda g: min(by_id[d][0]["precedence_level"] for d in g))
+    batches, current, size = [], [], 0
+    for g in groups:
+        g_size = sum(len(by_id[d][1]) for d in g)
+        if current and size + g_size > max_clauses:
+            batches.append(current)
+            current, size = [], 0
+        current.extend(by_id[d] for d in g)
+        size += g_size
+    if current:
+        batches.append(current)
+    return batches
+
+
+def _batch_prompt(tpl, employee, batch, number, total):
+    clauses = sum(len(rows) for _, rows in batch)
+    values = {"company": COMPANY, "employee_id": employee["employee_id"], "role": employee["role"],
+              "department": employee.get("department", ""), "experience_level": employee.get("experience_level", "Beginner"),
+              "joining_date": employee.get("joining_date", ""), "previous_experience": employee.get("previous_experience", "None"),
+              "stages": stage_names(), "min_modules": 1, "max_modules": max(2, math.ceil(clauses / 6)),
+              "schema_example": plan_example(), "sources": format_sources(batch)}
+    note = (f"\n\nBATCH {number} OF {total}: the other documents are handled in separate requests. "
+            f"Cover EVERY mandatory requirement in the sources above - do not skip any, even if the plan becomes long. "
+            f"Use only these sources.")
+    return tpl["system"].format(**values), tpl["user"].format(**values) + note
+
+
+def _renumber(batch_modules, start):
+    """Gives every module a unique id (M01, M02 ...) and fixes task, question and prerequisite ids."""
+    mapping = {}
+    for i, m in enumerate(batch_modules):
+        mapping[m["module_id"]] = f"M{start + i:02d}"
+    for m in batch_modules:
+        new_id = mapping[m["module_id"]]
+        m["module_id"] = new_id
+        m["prerequisites"] = [mapping[p] for p in m.get("prerequisites", []) if p in mapping]
+        for k, t in enumerate(m.get("tasks", []), start=1):
+            t["task_id"] = f"{new_id}-T{k}"
+        for k, q in enumerate(m.get("quiz", []), start=1):
+            q["question_id"] = f"{new_id}-Q{k}"
+    return batch_modules
+
+
+OBLIGATION_RX = re.compile(r"\b(must|shall|required|mandatory)\b", re.I)
+
+
+def _cited(modules):
+    return {(rc["source_document_id"].strip(), rc["source_section_id"].strip().lstrip("§ "))
+            for m in modules for rc in m.get("requirements_covered", [])}
+
+
+def _uncovered(selected, modules):
+    """Pipeline 1 self-check: clauses the model was asked to cover (they contain must/shall/required)
+    but did not cite. This only re-reads the prompt sources; Pipeline 2 still validates independently."""
+    cited = _cited(modules)
+    out = []
+    for d, rows in selected:
+        missing = [c for c in rows if OBLIGATION_RX.search(ex.clean_text(c["text"]))
+                   and (d["document_id"], c["section_id"]) not in cited]
+        if missing:
+            out.append((d, missing))
+    return out
+
+
+def _add_conflict_context(db, uncovered, selected):
+    """If an uncovered clause conflicts with another source, the other clause is added to the same request,
+    so the model can still decide with the precedence rules instead of blindly covering the weaker rule."""
+    lookup = {(d["document_id"], c["section_id"]): (d, c) for d, rows in selected for c in rows}
+    extra = {}
+    keys = {(d["document_id"], c["section_id"]) for d, rows in uncovered for c in rows}
+    for cf in db.conflicts.find({"kind": "conflict"}):
+        a = (cf["a"]["document_id"], cf["a"]["section_id"])
+        b = (cf["b"]["document_id"], cf["b"]["section_id"])
+        for mine, other in ((a, b), (b, a)):
+            if mine in keys and other in lookup and other not in keys:
+                extra.setdefault(other[0], []).append(lookup[other])
+    merged = {d["document_id"]: (d, list(rows)) for d, rows in uncovered}
+    for doc_id, pairs in extra.items():
+        d = pairs[0][0]
+        rows = merged.setdefault(doc_id, (d, []))[1]
+        for _, c in pairs:
+            if c not in rows:
+                rows.append(c)
+    return list(merged.values())
+
+
+def generate_plan_json(db, employee, request_id):
     tpl = load_template("onboarding_plan")
     selected = retrieve_sources(db, employee["role"])
     if not selected:
         raise GenerationFailed(f"No approved source documents apply to the role '{employee['role']}'.")
-    values = {"company": COMPANY, "employee_id": employee["employee_id"], "role": employee["role"],
-              "department": employee.get("department", ""), "experience_level": employee.get("experience_level", "Beginner"),
-              "joining_date": employee.get("joining_date", ""), "previous_experience": employee.get("previous_experience", "None"),
-              "stages": stage_names(), "min_modules": 6, "max_modules": 10, "schema_example": plan_example(),
-              "sources": format_sources(selected)}
-    return tpl, tpl["system"].format(**values), tpl["user"].format(**values), selected
+    batches = make_batches(db, selected, _setting("GENAI_BATCH_CLAUSES", 15))
+    total = len(batches)
+    app = current_app._get_current_object()
+    workers = max(1, _setting("GENAI_PARALLEL", 3))
 
+    def run_batches(batch_list, label, note_extra=""):
+        n = len(batch_list)
 
-def generate_plan_json(db, employee, request_id):
-    tpl, system, prompt, selected = build_plan_prompt(db, employee)
-    plan, attempts = call_with_retry(db, system, prompt, OnboardingPlan, "onboarding_plan", request_id)
-    meta = {"model": getattr(get_client(), "model", "?"), "provider": current_app.config.get("GENAI_PROVIDER"), "prompt_template": tpl["name"],
-            "prompt_version": tpl["version"], "temperature": current_app.config["GENAI_TEMPERATURE"],
-            "generated_at": now(), "attempts": attempts,
+        def run(index_batch):
+            index, batch = index_batch
+            with app.app_context():                 # each thread needs its own Flask context
+                system, prompt = _batch_prompt(tpl, employee, batch, index, n)
+                try:
+                    plan, attempts = call_with_retry(db, system, prompt + note_extra, OnboardingPlan,
+                                                     f"{label} {index}/{n}", request_id)
+                    return index, plan.model_dump(), attempts, None
+                except GenerationFailed as e:
+                    return index, None, 0, str(e)
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return sorted(pool.map(run, enumerate(batch_list, start=1)), key=lambda r: r[0])
+
+    modules, summaries, missing_info = [], [], []
+    attempts_total, failed_total, calls = 0, 0, 0
+
+    def merge(results, batch_list):
+        nonlocal attempts_total, failed_total, calls
+        for index, part, attempts, err in results:
+            calls += 1
+            attempts_total += attempts
+            if err:
+                failed_total += 1
+                docs = ", ".join(d["document_id"] for d, _ in batch_list[index - 1])
+                missing_info.append(f"Batch ({docs}) could not be generated: {err[:200]}")
+                continue
+            modules.extend(_renumber(part["modules"], len(modules) + 1))
+            summaries.append(part.get("summary", ""))
+            missing_info.extend(part.get("insufficient_information", []))
+
+    # pass 1: every approved source, in batches
+    merge(run_batches(batches, "onboarding_plan batch"), batches)
+    if not modules:
+        raise GenerationFailed(f"All {total} batches failed. See Logs & audit for the API error.")
+
+    # gap-fill rounds: send only the obligation clauses that were not covered yet
+    rounds_done = 0
+    gap_note = ("\n\nGAP-FILL REQUEST: the clauses above were NOT covered by the modules generated so far. "
+                "Create new modules that cover EACH mandatory clause above in requirements_covered. "
+                "If a clause is overruled by a higher-authority source shown above, do not cover it and write "
+                "its id in insufficient_information instead.")
+    for _ in range(_setting("GENAI_COVERAGE_ROUNDS", 2)):
+        gaps = _uncovered(selected, modules)
+        if not gaps:
+            break
+        gap_batches = make_batches(db, _add_conflict_context(db, gaps, selected), _setting("GENAI_BATCH_CLAUSES", 15))
+        merge(run_batches(gap_batches, "gap_fill batch", gap_note), gap_batches)
+        rounds_done += 1
+
+    plan = OnboardingPlan.model_validate({
+        "role": employee["role"], "employee_id": employee["employee_id"],
+        "summary": " ".join(s for s in summaries if s)[:2000] or "Onboarding plan generated from approved sources.",
+        "modules": modules, "insufficient_information": missing_info})
+    meta = {"model": getattr(get_client(), "model", "?"), "provider": current_app.config.get("GENAI_PROVIDER"),
+            "prompt_template": tpl["name"], "prompt_version": tpl["version"],
+            "temperature": current_app.config["GENAI_TEMPERATURE"], "generated_at": now(),
+            "attempts": attempts_total, "batches": calls, "failed_batches": failed_total,
+            "gap_fill_rounds": rounds_done,
             "source_versions": {d["document_id"]: d["version"] for d, _ in selected},
             "source_clause_count": sum(len(r) for _, r in selected)}
     return plan.model_dump(), meta

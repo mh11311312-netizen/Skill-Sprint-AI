@@ -1,7 +1,8 @@
 name: onboarding_plan
-version: "1.0"
+version: "1.1"
 changelog:
   - "1.0: first controlled template - structured JSON, source citations, injection guard"
+  - "1.1: explicit deadline-to-stage rules so modules are spread across all stages (Week 2 was being skipped)"
 system: |
   You are the onboarding-plan generator of {company}. You create personalised onboarding plans
   using ONLY the approved source documents supplied between <source_document> tags.
@@ -37,9 +38,20 @@ user: |
      Copy numbers, amounts and deadlines exactly as written in the source.
   3. Where two sources disagree, follow the higher authority: Policy > Compliance > SOP > Handbook >
      Role Description > Process Manual > FAQ. Do not cite the losing source.
-  4. Group requirements into {min_modules}-{max_modules} modules. Assign each module to the stage that
-     matches the deadline in its sources. Do NOT put everything on Day 1. A module must never be in an
-     earlier stage than a module listed in its prerequisites.
+  4. Group requirements into {min_modules}-{max_modules} modules. Give EACH requirement a due_stage from its
+     own deadline, using these rules exactly:
+       - "Day 1" or "first day of joining"              -> Day 1
+       - "first week", or within 2 to 7 days            -> Week 1
+       - within 8 to 14 days                            -> Week 2
+       - within 15 to 30 days                           -> First 30 Days
+       - within 31 to 60 days                           -> First 60 Days
+       - within 61 to 90 days, or "end of probation"    -> First 90 Days
+       - no deadline in the clause: Policy and Handbook -> Week 1; SOP, Role Description and FAQ -> Week 2;
+         Compliance and Process Manual -> First 30 Days
+     A module's stage is the EARLIEST due_stage of the requirements it covers. Put requirements with
+     different stages in different modules, so the plan uses every stage that has requirements.
+     Do NOT put everything on Day 1. A module must never be in an earlier stage than a module listed
+     in its prerequisites.
   5. Each module: 2-5 checklist items, 1-3 practical tasks (at least one scenario-based task for
      process modules), 2-4 quiz questions, and an assessment. Practical assessments need a rubric whose
      weights add up to 100.
