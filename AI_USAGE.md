@@ -7,3 +7,5 @@ OpenAI API (GPT-5.6) was used during runtime to generate onboarding plans for Pi
 Google Gemini API was used as an alternative provider for Pipeline 1 and can be switched through the `.env` configuration.
 
 The AI tools were mainly used to assist with planning, understanding the project, developing logic, and generating runtime responses where required.
+
+For the GUI, I selected the fonts and background independently and used AI only to obtain suggestions and recommendations regarding their overall appearance.
