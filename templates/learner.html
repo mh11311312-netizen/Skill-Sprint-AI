@@ -1,38 +1,77 @@
 {% extends "base.html" %}
-{% block heading %}Welcome, {{ e.full_name }}{% endblock %}
-{% block subheading %}<p class="sub">{{ e.role }} · joined {{ e.joining_date }}{% if r %} · day {{ r.day }} of onboarding{% endif %}</p>{% endblock %}
-{% block content %}
-{% if not plan %}<div class="panel"><p class="m-0">Your onboarding plan has not been approved yet. Please check back later or contact your reporting manager.</p></div>
+{% block title %}My learning{% endblock %}
+{% block learner_content %}
+{% if not plan %}
+<section class="hero">
+  <div><div class="eyebrow">Sitara Bank Ltd.</div><h1>{{ e.full_name.split(' ')[0] }}'s onboarding</h1>
+    <p>Your personalised onboarding plan is being prepared and reviewed. It will appear here as soon as it is approved. If you have questions, contact {{ e.reporting_manager or 'your reporting manager' }}.</p></div>
+  <div class="ring" style="--p:0"><div class="ring-v">0%<small>complete</small></div></div>
+</section>
 {% else %}
-{% if plan.status != 'Approved' %}<div class="alert alert-info small">A company policy changed recently. Some modules of your plan are being updated and reviewed; you can keep working on the rest.</div>{% endif %}
-<div class="row g-3 mb-3">
-  <div class="col-md-3"><div class="panel h-100"><div class="muted small">Your status</div>{{ stamp(r.status, 'lg') }}</div></div>
-  <div class="col-md-9"><div class="panel h-100"><div class="row g-3">
-    {% for label, val in [('Overall', r.overall), ('Modules', r.module_pct), ('Checklist', r.checklist_pct), ('Tasks', r.task_pct), ('Quiz average', r.quiz_avg)] %}
-    <div class="col-6 col-md"><div class="small d-flex justify-content-between"><span>{{ label }}</span><b>{{ val }}%</b></div><div class="progress"><div class="progress-bar" style="width: {{ val }}%"></div></div></div>{% endfor %}
-  </div></div></div>
-</div>
-{% if r.recommendations %}<div class="panel"><h2>Recommended next steps</h2>{% for x in r.recommendations %}<div class="small mb-1"><span class="stamp stamp-info">{{ x.type }}</span> {{ x.text }}</div>{% endfor %}</div>{% endif %}
 {% set p = r.progress %}
-{% for m in plan.plan_json.modules|by_stage %}{% set done = m.module_id in p.modules_done %}
-<div class="module-card {% if done %}done{% endif %}" id="{{ m.module_id }}">
-  <div class="d-flex justify-content-between flex-wrap gap-2"><div><span class="stage-label {% if m.module_id in r.overdue %}overdue{% endif %}">{{ m.stage }}{% if m.module_id in r.overdue %} · overdue{% endif %}</span>
-    <h3 class="h6 m-0">{{ m.module_title }}</h3><div class="small muted">{{ 'Mandatory' if m.mandatory else 'Optional' }} · {{ m.estimated_duration_minutes }} min · {{ m.difficulty }}</div></div>
-    <div class="d-flex gap-2 align-items-start">
-      {% if m.quiz %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('learner.quiz', module_id=m.module_id) }}">Quiz{% if m.module_id in r.best_scores %} (best {{ r.best_scores[m.module_id] }}%){% endif %}</a>{% endif %}
-      <form method="post" action="{{ url_for('learner.toggle') }}">{{ csrf() }}<input type="hidden" name="kind" value="module"><input type="hidden" name="key" value="{{ m.module_id }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
-      <button class="btn btn-sm {% if done %}btn-success{% else %}btn-primary{% endif %}">{% if done %}Completed ✓{% else %}Mark module complete{% endif %}</button></form></div></div>
-  <p class="small mt-2 mb-1">{{ m.purpose }}</p>
-  <details><summary class="small">Objectives, checklist and tasks</summary>
-    <ul class="small mt-2">{% for o in m.learning_objectives %}<li>{{ o }}</li>{% endfor %}</ul>
-    <b class="small">Checklist</b>
-    {% for c in m.checklist %}{% set key = m.module_id ~ ':' ~ loop.index0 %}
-    <form method="post" action="{{ url_for('learner.toggle') }}" class="small">{{ csrf() }}<input type="hidden" name="kind" value="checklist"><input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
-      <button class="btn btn-link btn-sm p-0 text-start">{{ '☑' if key in p.checklist_done else '☐' }} {{ c.activity }}</button> <span class="muted">({{ c.due_stage }}, {{ c.source_document_id }} §{{ c.source_section_id }})</span></form>{% endfor %}
-    <b class="small d-block mt-2">Tasks</b>
-    {% for t in m.tasks %}<form method="post" action="{{ url_for('learner.toggle') }}" class="small mb-1">{{ csrf() }}<input type="hidden" name="kind" value="task"><input type="hidden" name="key" value="{{ t.task_id }}"><input type="hidden" name="anchor" value="{{ m.module_id }}">
-      <button class="btn btn-link btn-sm p-0 text-start">{{ '☑' if t.task_id in p.tasks_done else '☐' }} {{ t.description }}</button><div class="muted">Done when: {{ t.completion_criteria }}</div></form>{% endfor %}
-  </details>
-</div>{% endfor %}
+{% if plan.status != 'Approved' %}<div class="alert alert-info">A company policy changed recently. Some modules of your plan are being updated; you can keep working on the rest.</div>{% endif %}
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">{{ e.role }} · Day {{ r.day }} of onboarding</div>
+    <h1>{{ e.full_name.split(' ')[0] }}'s onboarding</h1>
+    <p>{% if r.status == 'Completed' %}You have completed your onboarding plan. Well done.{% elif next_module %}Up next: <b class="text-white">{{ next_module.module_title }}</b> ({{ next_module.stage }}).{% endif %}</p>
+    <div class="hero-actions">
+      {% if next_module %}<a class="btn btn-light" href="{{ url_for('learner.module', module_id=next_module.module_id) }}"><i class="bi bi-play-fill"></i>Continue learning</a>{% endif %}
+      <a class="btn btn-outline-light" href="#path"><i class="bi bi-signpost-split"></i>View learning path</a>
+    </div>
+  </div>
+  <div class="text-center">
+    <div class="ring" style="--p:{{ r.overall }}"><div class="ring-v">{{ r.overall|round|int }}%<small>overall</small></div></div>
+    <div class="mt-2">{{ stamp(r.status) }}</div>
+  </div>
+</section>
+
+<div class="row g-3 mb-2">
+  {% for label, icon, val, sub in [('Modules', 'collection', r.module_pct, (p.modules_done|length) ~ ' of ' ~ plan.plan_json.modules|length ~ ' done'),
+                                   ('Checklist', 'list-check', r.checklist_pct, 'onboarding activities'),
+                                   ('Tasks', 'clipboard-check', r.task_pct, 'practical tasks'),
+                                   ('Quiz average', 'patch-question', r.quiz_avg, 'pass mark 70%')] %}
+  <div class="col-6 col-lg-3"><div class="tile"><div class="t-l"><i class="bi bi-{{ icon }}"></i>{{ label }}</div>
+    <div class="t-v">{{ val }}%</div><div class="progress"><div class="progress-bar" style="width: {{ val }}%"></div></div>
+    <div class="small muted mt-2">{{ sub }}</div></div></div>
+  {% endfor %}
+</div>
+
+{% if r.recommendations %}
+<div class="panel mt-3"><h2><i class="bi bi-lightbulb"></i>Recommended for you</h2>
+  <div class="row g-2">{% for x in r.recommendations[:6] %}<div class="col-md-6"><div class="d-flex gap-2 align-items-start small">
+    <span class="stamp stamp-info">{{ x.type }}</span><span>{{ x.text }}</span></div></div>{% endfor %}</div></div>
+{% endif %}
+
+<div class="panel mt-3" id="path"><h2><i class="bi bi-signpost-split"></i>Your learning path</h2>
+  <div class="path">
+    {% for st in path %}<div class="path-step {{ st.state }}">
+      <div class="path-dot">{% if st.state == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ loop.index }}{% endif %}</div>
+      <div class="path-name">{{ st.name }}</div><div class="path-meta">{{ st.done }} / {{ st.total }} modules</div></div>{% endfor %}
+  </div>
+</div>
+
+{% for st in path %}
+<div class="stage-heading"><h2>{{ st.name }}</h2><span class="muted small">due by day {{ st.due_day }} · {{ st.done }} of {{ st.total }} complete</span></div>
+<div class="row g-3">
+  {% for m in st.modules %}{% set c = cards[m.module_id] %}
+  <div class="col-md-6 col-xl-4">
+    <a class="text-decoration-none" href="{{ url_for('learner.module', module_id=m.module_id) }}">
+    <article class="course-card cat-{{ c.style[0] }}">
+      <div class="course-thumb"><i class="bi bi-{{ c.style[1] }} cat-icon" aria-hidden="true"></i><span class="cat-chip">{{ m.category }}</span></div>
+      <div class="course-body">
+        <h3 class="course-title">{{ m.module_title }}</h3>
+        <div class="course-meta"><span><i class="bi bi-clock"></i>{{ m.estimated_duration_minutes }} min</span>
+          <span><i class="bi bi-bar-chart"></i>{{ m.difficulty }}</span>{% if m.mandatory %}<span><i class="bi bi-asterisk"></i>Mandatory</span>{% endif %}</div>
+        <div class="course-foot">
+          <div class="flex-grow-1"><div class="progress"><div class="progress-bar" style="width: {{ c.pct }}%"></div></div></div>
+          {{ stamp(c.state) }}
+        </div>
+      </div>
+    </article></a>
+  </div>{% endfor %}
+</div>
+{% endfor %}
 {% endif %}
 {% endblock %}

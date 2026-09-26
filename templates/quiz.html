@@ -1,16 +1,24 @@
 {% extends "base.html" %}
-{% block heading %}Quiz · {{ module.module_title }}{% endblock %}
-{% block content %}
-<div class="panel"><form method="post">{{ csrf() }}
+{% block title %}Quiz · {{ module.module_title }}{% endblock %}
+{% block learner_content %}
+<div class="crumbs mb-2"><a href="{{ url_for('learner.home') }}">My learning</a> <i class="bi bi-chevron-right"></i>
+  <a href="{{ url_for('learner.module', module_id=module.module_id) }}">{{ module.module_title }}</a> <i class="bi bi-chevron-right"></i> Quiz</div>
+<h1 class="h3 fw-bold mb-3">Knowledge check</h1>
+{% if result %}<div class="panel d-flex align-items-center gap-3">
+  <div class="ring light" style="--p:{{ result.score }}"><div class="ring-v">{{ result.score|round|int }}%</div></div>
+  <div><div class="fw-bold">{{ 'Passed' if result.score >= 70 else 'Not passed yet' }} · {{ result.correct }} of {{ result.total }} correct</div>
+    <div class="small muted">Pass mark is 70%. Review the explanations below{% if result.score < 70 %} and the study material, then try again{% endif %}.</div></div>
+</div>{% endif %}
+<form method="post" class="row"><div class="col-lg-8">{{ csrf() }}
 {% for q in module.quiz %}
-  <fieldset class="mb-3"><legend class="h6">{{ loop.index }}. {{ q.question }}</legend>
-  {% set multi = q.type == 'multiple_response' %}
-  {% for o in q.options %}<div class="form-check"><input class="form-check-input" type="{{ 'checkbox' if multi else 'radio' }}" name="{{ q.question_id }}" value="{{ o }}" id="{{ q.question_id }}-{{ loop.index }}"
-    {% if result and o in result.answers[q.question_id] %}checked{% endif %}><label class="form-check-label" for="{{ q.question_id }}-{{ loop.index }}">{{ o }}</label></div>{% endfor %}
-  {% if result %}{% if q.question_id in result.wrong %}<div class="small text-danger mt-1">Incorrect. {{ q.explanation }} <span class="src">{{ q.source_document_id }} §{{ q.source_section_id }}</span></div>
-  {% else %}<div class="small text-success mt-1">Correct.</div>{% endif %}{% endif %}
+  <fieldset class="quiz-q"><legend>{{ loop.index }}. {{ q.question }}</legend>
+  {% set multi = q.type == 'multiple_response' %}{% if multi %}<div class="small muted">Select all that apply.</div>{% endif %}
+  {% for o in q.options %}<label class="quiz-opt" for="{{ q.question_id }}-{{ loop.index }}"><input type="{{ 'checkbox' if multi else 'radio' }}" name="{{ q.question_id }}" value="{{ o }}" id="{{ q.question_id }}-{{ loop.index }}"
+    {% if result and o in result.answers[q.question_id] %}checked{% endif %}>{{ o }}</label>{% endfor %}
+  {% if result %}{% if q.question_id in result.wrong %}<div class="alert alert-danger py-2 mt-3 mb-0 small"><b>Incorrect.</b> {{ q.explanation }} <span class="src">{{ q.source_document_id }} §{{ q.source_section_id }}</span></div>
+  {% else %}<div class="alert alert-success py-2 mt-3 mb-0 small"><b>Correct.</b> {{ q.explanation }}</div>{% endif %}{% endif %}
   </fieldset>{% endfor %}
-<button class="btn btn-primary">Submit answers</button> <a href="{{ url_for('learner.home') }}" class="ms-2">Back to my plan</a>
-</form></div>
-{% if result %}<div class="panel"><p class="m-0">Score <b>{{ result.score }}%</b> ({{ result.correct }}/{{ result.total }}). Pass mark is 70%.</p></div>{% endif %}
+  <div class="d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-send"></i>Submit answers</button>
+  <a href="{{ url_for('learner.module', module_id=module.module_id) }}" class="btn btn-outline-primary">Back to module</a></div>
+</div></form>
 {% endblock %}

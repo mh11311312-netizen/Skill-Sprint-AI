@@ -10,7 +10,7 @@ _CLASSES = {
              "Suspicious", "Optional Not Included", "Medium", "Manual Review Required", "Outdated"],
     "bad": ["Contradictory", "Contradiction Detected", "Unsupported", "Unsupported Requirement", "Incomplete",
             "Requirement Missing", "Source Support Missing", "Outdated Source", "Rejected", "Untrusted",
-            "Behind Schedule", "Requires Attention", "High", "missing", "outdated", "untrusted", "quarantined", "No"],
+            "Behind Schedule", "Requires Attention", "High", "missing", "outdated", "untrusted", "quarantined", "No", "Overdue"],
     "muted": ["Superseded", "Low", "Not Started", "-"],
 }
 

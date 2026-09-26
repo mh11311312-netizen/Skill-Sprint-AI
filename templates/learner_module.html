@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ m.module_title }}{% endblock %}
+{% block learner_content %}
+{% set done = m.module_id in p.modules_done %}
+<section class="module-hero band-{{ card.style[0] }}">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('learner.home') }}">My learning</a> <i class="bi bi-chevron-right"></i> {{ m.stage }}</div>
+    <h1>{{ m.module_title }}</h1>
+    <div class="course-meta"><span><i class="bi bi-{{ card.style[1] }}"></i>{{ m.category }}</span><span><i class="bi bi-clock"></i>{{ m.estimated_duration_minutes }} min</span>
+      <span><i class="bi bi-bar-chart"></i>{{ m.difficulty }}</span><span><i class="bi bi-flag"></i>{{ m.priority }} priority</span>
+      {% if m.mandatory %}<span><i class="bi bi-asterisk"></i>Mandatory</span>{% endif %}</div>
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <div class="ring light" style="--p:{{ card.pct }}"><div class="ring-v">{{ card.pct }}%</div></div>
+    {{ stamp(card.state, 'lg') }}
+  </div>
+</section>
+
+<div class="row g-4">
+<div class="col-lg-8">
+  <div class="panel"><h2><i class="bi bi-info-circle"></i>About this module</h2>
+    <p>{{ m.purpose }}</p>
+    <h3 class="h6 fw-bold mt-3">What you will learn</h3>
+    <ul>{% for o in m.learning_objectives %}<li>{{ o }}</li>{% endfor %}</ul>
+    {% if m.key_concepts %}<div class="d-flex flex-wrap gap-2">{% for k in m.key_concepts %}<span class="stamp stamp-muted">{{ k }}</span>{% endfor %}</div>{% endif %}
+  </div>
+
+  <div class="panel" id="material"><h2><i class="bi bi-book"></i>Study material</h2>
+    <p class="small muted">The official company rules this module is based on. Read them carefully - the quiz is built from these sections.</p>
+    {% for x in material %}<div class="material">
+      <div class="m-src"><span class="src">{{ x.doc.document_id }} §{{ x.chunk.section_id }}</span><b>{{ x.doc.title }}</b><span>· {{ x.chunk.section_heading }}</span><span>· v{{ x.doc.version }}</span></div>
+      <p>{{ x.chunk.text }}</p></div>
+    {% else %}<p class="muted m-0">No study material is linked to this module.</p>{% endfor %}
+  </div>
+
+  {% if m.checklist %}<div class="panel" id="checklist"><h2><i class="bi bi-list-check"></i>Onboarding checklist</h2>
+    {% for c in m.checklist %}{% set key = m.module_id ~ ':' ~ loop.index0 %}{% set on = key in p.checklist_done %}
+    <div class="check-row">
+      <form method="post" action="{{ url_for('learner.toggle') }}">{{ csrf() }}<input type="hidden" name="kind" value="checklist"><input type="hidden" name="key" value="{{ key }}">
+        <input type="hidden" name="module" value="{{ m.module_id }}"><input type="hidden" name="anchor" value="checklist">
+        <button class="check-btn {% if on %}on{% endif %}" aria-label="{{ 'Mark as not done' if on else 'Mark as done' }}">{% if on %}<i class="bi bi-check-lg"></i>{% endif %}</button></form>
+      <div><div class="fw-semibold {% if on %}text-decoration-line-through muted{% endif %}">{{ c.activity }}</div>
+        <div class="small muted">{{ 'Required' if c.required else 'Optional' }} · {{ c.due_stage }} · {{ c.responsible }} · <span class="src">{{ c.source_document_id }} §{{ c.source_section_id }}</span></div></div>
+    </div>{% endfor %}</div>{% endif %}
+
+  {% if m.tasks %}<div class="panel" id="tasks"><h2><i class="bi bi-clipboard-check"></i>Practical tasks</h2>
+    {% for t in m.tasks %}{% set on = t.task_id in p.tasks_done %}
+    <div class="check-row">
+      <form method="post" action="{{ url_for('learner.toggle') }}">{{ csrf() }}<input type="hidden" name="kind" value="task"><input type="hidden" name="key" value="{{ t.task_id }}">
+        <input type="hidden" name="module" value="{{ m.module_id }}"><input type="hidden" name="anchor" value="tasks">
+        <button class="check-btn {% if on %}on{% endif %}" aria-label="{{ 'Mark as not done' if on else 'Mark as done' }}">{% if on %}<i class="bi bi-check-lg"></i>{% endif %}</button></form>
+      <div><div class="fw-semibold">{% if t.scenario_based %}<span class="stamp stamp-info me-1">Scenario</span>{% endif %}{{ t.description }}</div>
+        <div class="small mt-1"><b>Expected outcome:</b> {{ t.expected_outcome }}</div>
+        <div class="small"><b>Done when:</b> {{ t.completion_criteria }}</div>
+        <div class="small muted">{{ t.difficulty }} · {{ t.due_stage }}</div></div>
+    </div>{% endfor %}</div>{% endif %}
+</div>
+
+<div class="col-lg-4">
+  <div class="side-card">
+    <div class="panel"><h2><i class="bi bi-trophy"></i>Complete this module</h2>
+      {% if m.quiz %}<p class="small mb-2">Knowledge check: {{ m.quiz|length }} question{{ 's' if m.quiz|length != 1 }} · pass mark 70%</p>
+        {% if m.module_id in r.best_scores %}<p class="small">Your best score: <b>{{ r.best_scores[m.module_id] }}%</b></p>{% endif %}
+        <a class="btn btn-outline-primary w-100 mb-2" href="{{ url_for('learner.quiz', module_id=m.module_id) }}"><i class="bi bi-patch-question"></i>{{ 'Retake quiz' if m.module_id in r.best_scores else 'Start quiz' }}</a>{% endif %}
+      <form method="post" action="{{ url_for('learner.toggle') }}">{{ csrf() }}<input type="hidden" name="kind" value="module"><input type="hidden" name="key" value="{{ m.module_id }}">
+        <input type="hidden" name="module" value="{{ m.module_id }}">
+        <button class="btn {% if done %}btn-success{% else %}btn-primary{% endif %} w-100">{% if done %}<i class="bi bi-check2-circle"></i>Completed{% else %}<i class="bi bi-check2"></i>Mark module as complete{% endif %}</button></form>
+      <p class="small muted mt-2 mb-0">Completion criteria: {{ m.completion_criteria }}</p>
+    </div>
+    {% if m.assessment %}<div class="panel"><h2><i class="bi bi-award"></i>Assessment</h2>
+      <p class="small mb-2"><b>{{ m.assessment.type|title }}:</b> {{ m.assessment.topic }}</p>
+      {% for rb in m.assessment.rubric %}<div class="small mb-2"><b>{{ rb.criterion }}</b> ({{ rb.weight }}%)<br><span class="muted">Pass: {{ rb.pass_condition }}</span></div>{% endfor %}
+    </div>{% endif %}
+  </div>
+</div>
+</div>
+{% endblock %}
