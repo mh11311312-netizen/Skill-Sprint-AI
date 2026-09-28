@@ -34,9 +34,10 @@ class GeminiClient:
 
 
 class OpenAIClient:
-    def __init__(self, api_key, model, timeout=180):
+    def __init__(self, api_key, model, timeout=180, reasoning_effort=""):
         if not api_key:
             raise GenAIError("OPENAI_API_KEY is not configured in the .env file.")
+        self.reasoning_effort = (reasoning_effort or "").strip().lower()
         from openai import OpenAI
         self.client = OpenAI(api_key=api_key, timeout=timeout, max_retries=0)   # our own retry logic is used
         self.model = model
@@ -51,6 +52,9 @@ class OpenAIClient:
                 "response_format": {"type": "json_object"}}     # forces a single valid JSON object
         if not self._uses_fixed_temperature():
             args["temperature"] = temperature
+        elif self.reasoning_effort:
+            # GPT-5 family: less internal "thinking" = fewer tokens and faster answers
+            args["reasoning_effort"] = self.reasoning_effort
         try:
             resp = self.client.chat.completions.create(**args)
         except Exception as e:                            # invalid key, quota, timeout, unknown model ...
@@ -79,7 +83,8 @@ def get_client():
     cfg = current_app.config
     provider = cfg.get("GENAI_PROVIDER", "openai")
     if provider == "openai":
-        return OpenAIClient(cfg["OPENAI_API_KEY"], cfg["OPENAI_MODEL"], cfg.get("GENAI_TIMEOUT_SECONDS", 180))
+        return OpenAIClient(cfg["OPENAI_API_KEY"], cfg["OPENAI_MODEL"], cfg.get("GENAI_TIMEOUT_SECONDS", 180),
+                            cfg.get("GENAI_REASONING_EFFORT", ""))
     if provider == "gemini":
         return GeminiClient(cfg["GEMINI_API_KEY"], cfg["GEMINI_MODEL"])
     raise GenAIError(f"Unknown GENAI_PROVIDER '{provider}'. Use 'openai' or 'gemini'.")

@@ -40,3 +40,15 @@ def test_missing_reference_detected(ctx):
 def test_prerequisite_linked(ctx):
     r = ctx.requirements.find_one({"requirement_id": "POL-06-2.2"})
     assert "POL-04-2.1" in r["prerequisites"]
+
+
+
+def test_invalid_skip_reasons_are_detected():
+    from contradiction_checks.source_conflicts import parse_skip_claims, skip_claim_problem
+    cats = {"POL-02": "Policy", "POL-07": "Policy", "CMP-01": "Compliance", "FAQ-02": "FAQ", "POL-04": "Policy"}
+    claims = parse_skip_claims(["POL-02-2.4: overruled by POL-02-4.1; POL-07-2.2: overruled by CMP-01-2.5",
+                                "FAQ-02-1.1: overruled by POL-04-3.2"])
+    assert claims == [("POL-02-2.4", "POL-02-4.1"), ("POL-07-2.2", "CMP-01-2.5"), ("FAQ-02-1.1", "POL-04-3.2")]
+    assert "own rule" in skip_claim_problem(*claims[0], cats)
+    assert "does not outrank" in skip_claim_problem(*claims[1], cats)
+    assert skip_claim_problem(*claims[2], cats) is None          # a real precedence case is accepted

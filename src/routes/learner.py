@@ -52,8 +52,16 @@ def _module_state(m, p, r):
 @login_required
 def home():
     db, e, plan = _my_plan()
+    # even when no approved plan exists yet, show a status card so the employee knows what is happening
+    pending = db.plans.find_one({"employee_id": e["employee_id"], "status": {"$ne": "Approved"}},
+                                sort=[("created_at", -1)]) if e else None
     if not plan:
-        return render_template("learner.html", e=e, plan=None, r=None)
+        pending_status = None
+        if pending:
+            v = (pending.get("validation") or {}).get("status", "")
+            pending_status = {"kind": pending.get("status") or "Pending Review", "verification": v,
+                              "created_at": pending.get("created_at"), "reviewer": pending.get("assigned_reviewer")}
+        return render_template("learner.html", e=e, plan=None, r=None, pending=pending_status)
     r = assess(db, plan, e)
     p = r["progress"]
     modules = sorted(plan["plan_json"]["modules"], key=lambda m: stage_index(m["stage"]))

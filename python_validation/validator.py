@@ -149,6 +149,15 @@ def validate_plan(db, plan):
                 if nums:
                     issue("Unsupported fact", "High", where, f"Numbers {', '.join(nums)} are not in the cited source.")
 
+    # ---------- 3b. the model's reasons for skipping requirements must be real precedence cases ----------
+    from contradiction_checks.source_conflicts import parse_skip_claims, skip_claim_problem
+    category_of = {d["document_id"]: d["category"] for d in db.documents.find({"status": "Active"}, {"document_id": 1, "category": 1})}
+    covered_now = set(generated) | {alias.get(g, g) for g in generated}
+    for skipped, by in parse_skip_claims(pj.get("insufficient_information", [])):
+        why = skip_claim_problem(skipped, by, category_of)
+        if why and skipped not in covered_now:
+            issue("Invalid skip reason", "Medium", skipped, f"The model skipped {skipped} as 'overruled by {by}', but {why}.")
+
     # ---------- 4. sequencing, prerequisites, duplicates, stage spread ----------
     _check_sequence(pj, expected, alias, issue)
     _check_duplicates(pj, rules, issue)

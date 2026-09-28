@@ -18,6 +18,9 @@ UNIT_RX = re.compile(
 PERMISSIVE = re.compile(r"\b(may|can|allowed|entitled|yes)\b", re.I)
 RESTRICTIVE_EXTRA = re.compile(r"\bmust be approved\b|\bonly (after|with)\b|\brequires? [a-z ]*approval\b", re.I)
 PREREQ_RULE = re.compile(r"must be completed before", re.I)
+# words about WHO approves, not WHAT the rule is about; two rules sharing only these are different topics
+GOVERNANCE_WORDS = {"approve", "approval", "approved", "branch", "manager", "pkr", "customer", "staff", "head",
+                    "officer", "executive", "supervisor", "department", "may", "without"}
 STRONG_NEGATIVE = re.compile(r"\b(must not|shall not|cannot|can not|not entitled|not permitted|prohibited|"
                              r"no longer|without|exempt|never)\b", re.I)
 
@@ -79,6 +82,7 @@ def detect(statements):
     perm = [bool(PERMISSIVE.search(s["text"])) for s in statements]
     restr = [bool(STRONG_NEGATIVE.search(s["text"]) or RESTRICTIVE_EXTRA.search(s["text"])) for s in statements]
     ordering = [bool(PREREQ_RULE.search(s["text"])) for s in statements]
+    topic = [set(tokens(s["text"], drop_filler=True)) - GOVERNANCE_WORDS for s in statements]
     conflicts, duplicates = [], []
     for i in range(len(statements)):
         a = statements[i]
@@ -92,7 +96,7 @@ def detect(statements):
             shared = set(units[i]) & set(units[j])
             numeric = sim >= rules["conflict_similarity"] and any(units[i][u] != units[j][u] for u in shared)
             # a permission in one source that the other source restricts
-            polarity = sim >= rules["polarity_similarity"] and (
+            polarity = sim >= rules["polarity_similarity"] and bool(topic[i] & topic[j]) and (
                 (perm[i] and restr[j] and not perm[j]) or (perm[j] and restr[i] and not perm[i]))
             if numeric or polarity:
                 ra, rb = set(a.get("roles", [])), set(b.get("roles", []))
@@ -117,3 +121,33 @@ def detect(statements):
 def _brief(s):
     return {"id": s["id"], "document_id": s["document_id"], "section_id": s["section_id"],
             "category": s["category"], "effective_date": s["effective_date"], "text": s["text"]}
+
+
+# ---- checking the model's own "overruled by" explanations ----
+SKIP_RX = re.compile(r"([A-Z]{2,5}-[A-Z0-9-]*?\d+-\d+(?:\.\d+)?)\s*:\s*overruled by\s+([A-Z]{2,5}-[A-Z0-9-]*?\d+-\d+(?:\.\d+)?)", re.I)
+
+
+def doc_of(requirement_id):
+    return requirement_id.rsplit("-", 1)[0]
+
+
+def parse_skip_claims(entries):
+    """'POL-02-2.4: overruled by POL-02-4.1' -> [('POL-02-2.4', 'POL-02-4.1')]"""
+    out = []
+    for e in entries or []:
+        for a, b in SKIP_RX.findall(str(e)):
+            out.append((a.upper(), b.upper()))
+    return out
+
+
+def skip_claim_problem(skipped, by, category_of):
+    """Returns why a skip is not allowed, or None if it is a valid precedence skip.
+    category_of: {document_id: category} for the active documents."""
+    da, db_ = doc_of(skipped), doc_of(by)
+    if da == db_:
+        return "a document cannot overrule its own rule"
+    if da not in category_of or db_ not in category_of:
+        return "one of the documents is not an active approved source"
+    if precedence_level(category_of[db_]) >= precedence_level(category_of[da]):
+        return f"{db_} ({category_of[db_]}) does not outrank {da} ({category_of[da]})"
+    return None

@@ -17,6 +17,7 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
     GENAI_TIMEOUT_SECONDS = int(os.getenv("GENAI_TIMEOUT_SECONDS", "180"))
+    GENAI_REASONING_EFFORT = os.getenv("GENAI_REASONING_EFFORT", "")   # low / medium / high (GPT-5 family only)
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GENAI_TEMPERATURE = float(os.getenv("GENAI_TEMPERATURE", "0.2"))

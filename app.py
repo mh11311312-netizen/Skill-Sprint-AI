@@ -1,5 +1,6 @@
 """SkillSprint AI - Flask application entry point.  Run:  python app.py"""
 import os
+import time
 from flask import Flask, render_template, session
 from config.settings import Config
 from database.db import init_db
@@ -17,6 +18,28 @@ def create_app(overrides=None):
     app.jinja_env.globals["csrf_token"] = csrf_token
     app.before_request(verify_csrf)
 
+    @app.before_request
+    def start_timer():
+        from flask import g
+        g.started = time.time()
+
+    @app.after_request
+    def log_slow_requests(response):
+        # prints pages that take longer than 1 second, to find what is slow
+        from flask import g, request
+        took = time.time() - getattr(g, "started", time.time())
+        if took > 1.0 and not request.path.startswith("/static"):
+            print(f"[slow] {request.method} {request.path} took {took:.1f}s")
+        return response
+
+    @app.before_request
+    def force_password_change():
+        # accounts created with the default password must set their own before using the app
+        from flask import request, redirect, url_for
+        if session.get("must_change_password") and request.endpoint not in (
+                "auth.change_password", "auth.logout", "static", "main.about"):
+            return redirect(url_for("auth.change_password"))
+
     from src.routes import register_blueprints
     register_blueprints(app)
 
@@ -25,11 +48,15 @@ def create_app(overrides=None):
         # pending_reviews is display-only (header bell + sidebar badge); it does not change any logic
         pending = 0
         if session.get("app_role") in ("admin", "training_manager", "reviewer", "manager"):
-            try:
-                from database.db import get_db
-                pending = get_db().plans.count_documents({"status": {"$in": ["Pending Review", "Outdated", "Generated"]}})
-            except Exception:
-                pending = 0
+            cache = app.extensions.setdefault("pending_cache", {"at": 0.0, "n": 0})
+            if time.time() - cache["at"] > 30:              # count at most every 30 seconds
+                try:
+                    from database.db import get_db
+                    cache["n"] = get_db().plans.count_documents({"status": {"$in": ["Pending Review", "Outdated", "Generated"]}})
+                    cache["at"] = time.time()
+                except Exception:
+                    pass
+            pending = cache["n"]
         return {"current_user": session.get("username"), "current_role": session.get("app_role"),
                 "current_employee": session.get("employee_id"), "pending_reviews": pending}
 

@@ -11,7 +11,7 @@ precedence_levels:
   Informal Guidance: 8
 # Categories that can never create or override requirements (routed to manual review instead)
 untrusted_categories: [Guideline, Informal Guidance]
-untrusted_owners: [Unknown, "", None]
+untrusted_owners: [Unknown]   # an owner written as "Unknown" in the document itself
 rules:
   - Only the Active version of a document is used; superseded versions are ignored.
   - When two active sources conflict, the lower precedence level wins.

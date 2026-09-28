@@ -55,7 +55,7 @@
       {{ link('employees.index', 'people', 'Employees', ep.startswith('employees')) }}
       <div class="nav-group">Onboarding plans</div>
       {{ link('plans.index', 'card-checklist', 'All plans', ep in ('plans.index', 'plans.detail')) }}
-      {{ link('plans.review_queue', 'inbox', 'Review queue', ep == 'plans.review_queue', pending_reviews) }}
+      {{ link('plans.review_queue', 'inbox', 'Review queue', ep == 'plans.review_queue') }}
       {{ link('plans.impact', 'arrow-repeat', 'Policy impact', ep == 'plans.impact') }}
       {{ link('plans.compare', 'layout-split', 'Compare plans', ep == 'plans.compare') }}
       {{ link('plans.topic', 'lightbulb', 'Topic request', ep == 'plans.topic') }}
@@ -64,7 +64,7 @@
       {{ link('admin.logs', 'clock-history', 'Logs & audit', ep == 'admin.logs') }}
       {% if current_role == 'admin' %}{{ link('admin.users', 'person-gear', 'Users', ep == 'admin.users') }}{% endif %}
     </nav>
-    <div class="side-foot"><b>Sitara Bank Ltd.</b>Internal system · Karachi</div>
+    <div class="side-foot"><a class="side-link side-logout" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-left" aria-hidden="true"></i><span>Log out</span></a></div>
   </aside>
   <div class="sidebar-backdrop" onclick="document.getElementById('sidebar').classList.remove('open')"></div>
   <div class="content">
@@ -73,14 +73,14 @@
         <button class="menu-toggle" type="button" aria-label="Open menu" aria-controls="sidebar" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="bi bi-list"></i></button>
         <div class="page-title"><h1>{% block heading %}{% endblock %}</h1>{% block subheading %}{% endblock %}</div>
       </div>
-      <form class="top-search" role="search" action="{{ url_for('employees.index') }}" method="get">
+      <form class="top-search" role="search" action="{{ url_for('main.search') }}" method="get">
         <i class="bi bi-search" aria-hidden="true"></i>
-        <label class="visually-hidden" for="top-q">Search employees</label>
-        <input id="top-q" name="search" placeholder="Search employees by name or ID" value="{{ request.args.search if request.endpoint == 'employees.index' else '' }}">
+        <label class="visually-hidden" for="top-q">Search</label>
+        <input id="top-q" name="q" placeholder="Search employees, roles, documents, modules..." value="{{ request.args.q if request.endpoint == 'main.search' else '' }}">
       </form>
       <div class="header-tools">
-        <a class="icon-btn" href="{{ url_for('plans.review_queue') }}" title="Review queue" aria-label="Review queue: {{ pending_reviews }} waiting">
-          <i class="bi bi-bell"></i>{% if pending_reviews %}<span class="dot">{{ pending_reviews if pending_reviews < 100 else '99+' }}</span>{% endif %}</a>
+        <a class="icon-btn" href="{{ url_for('plans.review_queue') }}" title="Review queue" aria-label="Review queue">
+          <i class="bi bi-bell"></i>{% if pending_reviews %}<span class="dot dot-plain" aria-hidden="true"></span>{% endif %}</a>
         <span class="header-divider" aria-hidden="true"></span>
         <div class="user-chip">
           <div class="avatar" aria-hidden="true">{{ (current_user or '?')[:2]|upper }}</div>

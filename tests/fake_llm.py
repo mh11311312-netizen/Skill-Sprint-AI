@@ -45,9 +45,11 @@ class FakeLLM:
         modules, skip = [], {"FAQ"}
         by_doc = {}
         for m in LINE.finditer(prompt):
-            if cats.get(m["doc"]) in skip or not re.search(r"\b(must|shall|required)\b", m["text"], re.I):
+            if ("MISSING-REQUIREMENTS REQUEST" not in prompt and cats.get(m["doc"]) in skip) or not re.search(r"\b(must|shall|required)\b", m["text"], re.I):
                 continue
             by_doc.setdefault(m["doc"], []).append(m)
+        if "lazy" in self.mistakes:                      # behave like a model that stops early
+            by_doc = {d: it[: max(1, len(it) * 2 // 5)] for d, it in by_doc.items()}
         for i, (doc, items) in enumerate(by_doc.items(), start=1):
             modules.append(self._module(f"M{i:02d}", doc, items, cats[doc]))
         plan = {"role": role.group(1).strip() if role else "?", "employee_id": emp.group(1).strip() if emp else "?",

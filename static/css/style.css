@@ -480,3 +480,81 @@ html { scrollbar-color: #5a4636 transparent; }
                  border-bottom: 1px solid rgba(0, 0, 0, .45); box-shadow: 0 1px 0 rgba(255, 238, 220, .05); }
 .learner-nav .logo .logo-sub { color: #e8dccf; }
 .login-box .logo { margin-bottom: 1.6rem; }
+
+/* ---------- 13. About (public landing) page ---------- */
+.site-inner { max-width: 1160px; margin: 0 auto; padding: 0 1.5rem; }
+.site-nav { position: sticky; top: 0; z-index: 30; background: var(--metal); border-bottom: 1px solid rgba(0, 0, 0, .55);
+            box-shadow: 0 1px 0 rgba(255, 238, 220, .25) inset, 0 4px 12px rgba(0, 0, 0, .35); }
+.site-nav .site-inner { display: flex; align-items: center; gap: 2rem; min-height: 68px; }
+.site-nav .logo .logo-sub { color: #e8dccf; }
+.site-links { display: flex; gap: .3rem; flex: 1; }
+.site-links a { color: #f4ebe1; font-size: .88rem; font-weight: 500; padding: .4rem .75rem; border-radius: 999px; text-decoration: none; }
+.site-links a:hover { background: rgba(0, 0, 0, .18); color: #fff; text-decoration: none; }
+.about-hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2.5rem; align-items: center; padding-top: 4rem; padding-bottom: 3rem; }
+.about-hero h1 { font-size: 2.5rem; line-height: 1.15; font-weight: 700; margin: 0 0 1rem; max-width: 18ch; }
+.about-hero p { font-size: 1.02rem; line-height: 1.7; color: var(--text-2); margin: 0 0 1.6rem; max-width: 58ch; }
+.about-list { list-style: none; margin: 0; padding: 0; }
+.about-list li { display: flex; gap: .8rem; padding: .75rem 0; border-top: 1px solid var(--line); }
+.about-list li:first-child { border-top: 0; padding-top: 0; }
+.about-list i { color: var(--gold); font-size: 1.1rem; margin-top: .1rem; }
+.about-list b { display: block; color: var(--text); font-size: .92rem; }
+.about-list span { font-size: .82rem; color: var(--muted); }
+.about-section { padding-top: 2.5rem; padding-bottom: 1rem; scroll-margin-top: 80px; }
+.about-section h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .4rem; }
+.about-lead { color: var(--muted); font-size: .95rem; margin: 0 0 1.4rem; max-width: 70ch; line-height: 1.65; }
+.about-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.about-steps li { display: flex; gap: .85rem; background: linear-gradient(180deg, #2c221c 0%, var(--panel) 100%); border: 1px solid var(--rim);
+                  border-radius: var(--r-xl); padding: 1rem 1.1rem; box-shadow: var(--shadow); }
+.about-steps li > span { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+                         color: #2a1e17; background: var(--metal-light); border: 1px solid rgba(0, 0, 0, .4); }
+.about-steps b { color: var(--text); font-size: .95rem; }
+.about-steps p { margin: .25rem 0 0; font-size: .85rem; color: var(--muted); line-height: 1.55; }
+.about-feature i { font-size: 1.3rem; color: var(--gold); }
+.about-feature h3 { font-size: 1rem; font-weight: 700; margin: .6rem 0 .3rem; }
+.about-feature p { margin: 0; font-size: .86rem; color: var(--muted); line-height: 1.55; }
+.about-role { border-left: 3px solid var(--gold); padding: .3rem 0 .3rem 1rem; height: 100%; }
+.about-role b { color: var(--text); }
+.about-role p { margin: .25rem 0 0; font-size: .86rem; color: var(--muted); }
+.about-security { display: flex; justify-content: space-between; align-items: center; gap: 2rem; }
+.site-footer { margin-top: 3rem; padding: 1.2rem 0; border-top: 1px solid rgba(0, 0, 0, .45); background: rgba(0, 0, 0, .15); font-size: .8rem; color: var(--muted); }
+.site-footer .site-inner { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+@media (max-width: 991.98px) {
+  .about-hero { grid-template-columns: 1fr; padding-top: 2.5rem; }
+  .about-hero h1 { font-size: 2rem; }
+  .about-steps { grid-template-columns: 1fr 1fr; }
+  .site-links { display: none; }
+  .site-nav .site-inner { justify-content: space-between; }
+  .about-security { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 575.98px) { .about-steps { grid-template-columns: 1fr; } .about-hero h1 { font-size: 1.65rem; } }
+
+/* ---------- 14. Small clean-ups ---------- */
+.icon-btn .dot.dot-plain { min-width: 9px; width: 9px; height: 9px; padding: 0; top: 6px; right: 6px; border-width: 2px; }
+.side-foot { padding: .6rem .7rem; }
+.side-logout { margin: 0; color: var(--muted); }
+.side-logout:hover { color: #f29a8e; background: rgba(229, 154, 143, .08); }
+.side-logout:hover i { color: #f29a8e; }
+.brain { padding: 1rem 1.1rem; }
+
+/* ---------- 15. Employee pending-plan steps ---------- */
+.pending-steps { display: grid; gap: .55rem; }
+.pending-steps .step { display: flex; gap: .7rem; align-items: flex-start; padding: .55rem .8rem; border-radius: 10px; background: rgba(0, 0, 0, .18); border: 1px solid var(--line); color: var(--muted); }
+.pending-steps .step i { font-size: 1.1rem; margin-top: .05rem; color: var(--muted); }
+.pending-steps .step b { display: block; color: var(--text-2); font-size: .92rem; }
+.pending-steps .step span { font-size: .82rem; }
+.pending-steps .step em { color: var(--gold); font-style: normal; }
+.pending-steps .step.done i { color: #7fd49d; }
+.pending-steps .step.done b { color: var(--text); }
+.pending-steps .step.current { background: rgba(227, 181, 98, .09); border-color: rgba(227, 181, 98, .35); }
+.pending-steps .step.current i { color: var(--gold); }
+.pending-steps .step.current b { color: var(--text); }
+
+/* ---------- 16. Show/hide password ---------- */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 2.6rem; }
+.pw-eye { position: absolute; top: 50%; right: .5rem; transform: translateY(-50%); background: transparent; border: 0; padding: .35rem .5rem;
+          color: var(--muted); border-radius: 8px; line-height: 1; cursor: pointer; }
+.pw-eye:hover { color: var(--text); background: rgba(255, 238, 220, .06); }
+.pw-eye .bi-eye-slash { display: none; }
+.pw-eye.on .bi-eye { display: none; }
+.pw-eye.on .bi-eye-slash { display: inline; color: var(--gold); }

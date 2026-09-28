@@ -61,7 +61,10 @@ def ingest(db, filename, data, form_meta, config, user):
         flags.append({"section_id": "metadata", "types": ["Unauthorised supersede claim"], "text": f"Supersedes: {sup}"})
     prec = load_yaml("precedence_rules.yaml")
     trust = "Trusted"
-    if meta["category"] in prec["untrusted_categories"] or meta.get("owner", "Unknown") in prec["untrusted_owners"]:
+    owner = (meta.get("owner") or "").strip()
+    if not owner:
+        warnings.append("Document owner is not stated - please add it to the document control table.")
+    if meta["category"] in prec["untrusted_categories"] or owner in prec["untrusted_owners"]:
         trust = "Untrusted"
     elif flags:
         trust = "Suspicious"
@@ -90,7 +93,7 @@ def ingest(db, filename, data, form_meta, config, user):
         "doc_key": doc_key, "document_id": doc_id, "title": meta["title"], "category": meta["category"],
         "department": meta["department"], "version": ver, "version_num": version_number(ver), "status": status,
         "effective_date": meta["effective_date"], "review_date": meta.get("review_date", ""),
-        "owner": meta.get("owner", "Unknown"), "supersedes": sup, "file_name": filename, "file_type": ext,
+        "owner": owner or "Not stated", "supersedes": sup, "file_name": filename, "file_type": ext,
         "file_hash": digest, "uploaded_by": user, "uploaded_at": now(), "trust": trust,
         "precedence_level": precedence_level(meta["category"]), "security_flags": flags,
         "warnings": warnings, "chunk_count": len(chunks), "changes": changes,

@@ -34,6 +34,12 @@ def rebuild_matrix(db, user="system"):
             sid = f"{d['document_id']}-{c['section_id']}"
             ob = ex.obligation(text)
             roles, how, unmapped = ex.resolve_roles(c.get("applies_to_raw", ""), c["text"], names)
+            if how == "inferred_from_text":
+                # documents without "Applies to" lines: a role named in the title (e.g. "Loan Officer Role Guide")
+                # is also responsible for the clauses of that document
+                for r in names:
+                    if r.lower() in d["title"].lower() and r not in roles:
+                        roles.append(r)
             statements.append({"id": sid, "document_id": d["document_id"], "category": d["category"],
                                "effective_date": d["effective_date"], "text": text, "section_id": c["section_id"],
                                "roles": roles, "all_roles": len(roles) == len(names), "obligation": ob})

@@ -27,6 +27,17 @@ def _create_indexes(db):
     db.chunks.create_index([("document_id", ASCENDING), ("version", ASCENDING)])
     db.requirements.create_index([("requirement_id", ASCENDING)])
     db.plans.create_index([("plan_id", ASCENDING)], unique=True)
+    # indexes for the filters used on almost every page
+    db.plans.create_index([("status", ASCENDING)])
+    db.plans.create_index([("employee_id", ASCENDING)])
+    db.plans.create_index([("role", ASCENDING)])
+    db.requirements.create_index([("roles", ASCENDING), ("active", ASCENDING)])
+    db.requirements.create_index([("document_id", ASCENDING)])
+    db.documents.create_index([("document_id", ASCENDING), ("status", ASCENDING)])
+    db.employees.create_index([("role", ASCENDING)])
+    db.progress.create_index([("plan_id", ASCENDING)])
+    db.generation_logs.create_index([("request_id", ASCENDING)])
+    db.audit_log.create_index([("entity_id", ASCENDING)])
 
 
 def get_db():

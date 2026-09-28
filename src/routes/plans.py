@@ -3,7 +3,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from pydantic import ValidationError
 from database.db import get_db
 from security.auth import roles_required
-from genai_pipeline.generator import create_plan, regenerate_modules, generate_plan_json, GenerationFailed, topic_module
+from genai_pipeline.generator import (create_plan, regenerate_modules, generate_plan_json, GenerationFailed,
+                                     topic_module, add_missing_modules)
 from python_validation.validator import run_validation
 from comparison_engine.consistency import compare_generations
 from schemas.plan_schema import Module
@@ -27,7 +28,8 @@ def index():
     if request.args.get("verification"):
         q["validation.status"] = request.args["verification"]
     db = get_db()
-    plans = list(db.plans.find(q, {"plan_json": 0, "original_plan_json": 0}).sort("created_at", -1))
+    plans = list(db.plans.find(q, {"plan_json": 0, "original_plan_json": 0, "validation.rows": 0,
+                                   "validation.issues": 0}).sort("created_at", -1))
     return render_template("plans.html", plans=plans, roles=list(db.roles.find().sort("role_id", 1)))
 
 
@@ -39,8 +41,10 @@ def generate(employee_id):
     try:
         plan = create_plan(db, e, session["username"])
         result = run_validation(db, plan, session["username"])
-        flash(f"Plan generated and validated: {result['status']} (coverage {result['scores']['coverage']}%, "
-              f"traceability {result['scores']['traceability']}%).", "success" if result["status"] == "Verified" else "warning")
+        late = plan["generation"].get("late_requests", 0)
+        flash(f"Plan generated in {plan['generation'].get('seconds', '?')} s and validated: {result['status']} "
+              f"(coverage {result['scores']['coverage']}%, traceability {result['scores']['traceability']}%)."
+              + (f" {late} request(s) did not finish within the time limit - use 'Add missing requirements'." if late else ""), "success" if result["status"] == "Verified" else "warning")
         return redirect(url_for("plans.detail", plan_id=plan["plan_id"]))
     except GenerationFailed as ex:
         flash(str(ex), "danger")
@@ -78,6 +82,14 @@ def review(plan_id):
         log_audit("comment", "plan", plan_id, comment=comment)
     elif action in ("approve", "reject"):
         new = "Approved" if action == "approve" else "Rejected"
+        scores = (plan.get("validation") or {}).get("scores") or {}
+        if action == "approve" and (not plan.get("validation") or scores.get("coverage", 0) < 100):
+            # SRS non-functional requirement 4: 100% mandatory coverage before final approval
+            missing = scores.get("missing_count", "some")
+            flash(f"This plan cannot be approved yet: mandatory coverage is {scores.get('coverage', 0)}% "
+                  f"({missing} mandatory requirement(s) missing). Use 'Add missing requirements' or edit the "
+                  "modules, then approve.", "danger")
+            return redirect(url_for("plans.detail", plan_id=plan_id))
         override = action == "approve" and vstatus != "Verified"
         if override and not comment:
             flash("Approving a plan that is not Verified is an override - a justification comment is required.", "danger")
@@ -164,6 +176,26 @@ def regenerate(plan_id):
     return redirect(url_for("plans.detail", plan_id=plan_id))
 
 
+@bp.route("/<plan_id>/fill-missing", methods=["POST"])
+@roles_required(*REVIEWERS)
+def fill_missing(plan_id):
+    db = get_db()
+    plan = _plan(plan_id)
+    rows = (plan.get("validation") or {}).get("rows", [])
+    missing = [r["requirement_id"] for r in rows if r["status"] == "Requirement Missing"]
+    if not missing:
+        flash("No mandatory requirement is missing.", "info")
+        return redirect(url_for("plans.detail", plan_id=plan_id))
+    try:
+        added = add_missing_modules(db, plan, missing, session["username"])
+        r = run_validation(db, db.plans.find_one({"_id": plan["_id"]}), session["username"])
+        flash(f"Added {len(added)} module(s) for {len(missing)} missing requirement(s). "
+              f"Coverage is now {r['scores']['coverage']}%.", "success" if r["scores"]["coverage"] == 100 else "warning")
+    except GenerationFailed as ex:
+        flash(str(ex), "danger")
+    return redirect(url_for("plans.detail", plan_id=plan_id))
+
+
 @bp.route("/<plan_id>/consistency", methods=["POST"])
 @roles_required(*EDITORS)
 def consistency(plan_id):
@@ -194,7 +226,7 @@ def download_json(plan_id):
 @roles_required(*STAFF)
 def compare():
     db = get_db()
-    all_plans = list(db.plans.find({}, {"plan_json": 0}).sort("created_at", -1))
+    all_plans = list(db.plans.find({}, {"plan_id": 1, "role": 1}).sort("created_at", -1))
     a, b = request.args.get("a"), request.args.get("b")
     pa, pb = (db.plans.find_one({"plan_id": a}) if a else None), (db.plans.find_one({"plan_id": b}) if b else None)
     diff = None

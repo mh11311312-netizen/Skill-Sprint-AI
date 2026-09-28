@@ -4,7 +4,15 @@
 {% if not plan %}
 <section class="hero">
   <div><div class="eyebrow">Sitara Bank Ltd.</div><h1>{{ e.full_name.split(' ')[0] }}'s onboarding</h1>
-    <p>Your personalised onboarding plan is being prepared and reviewed. It will appear here as soon as it is approved. If you have questions, contact {{ e.reporting_manager or 'your reporting manager' }}.</p></div>
+    <p>Your personalised onboarding plan is being prepared and reviewed. It will appear here as soon as it is approved. If you have questions, contact {{ e.reporting_manager or 'your reporting manager' }}.</p>
+  {% if pending %}<div class="pending-steps mt-3">
+    {% set st = pending.kind %}
+    <div class="step {{ 'done' if st in ['Generated','Pending Review','Approved'] else '' }}"><i class="bi bi-check-circle"></i><div><b>Plan drafted</b><span>Your trainer generated a plan from the approved policies.</span></div></div>
+    <div class="step {{ 'done' if pending.verification and st != 'Generated' else '' }}"><i class="bi bi-check-circle"></i><div><b>Automatic check</b><span>Python validated coverage, sources and sequence{% if pending.verification %} · <em>{{ pending.verification }}</em>{% endif %}.</span></div></div>
+    <div class="step current"><i class="bi bi-hourglass-split"></i><div><b>Review by {{ pending.reviewer or 'a trainer or reviewer' }}</b><span>They will approve, correct or ask the model to fill any missing parts. You will see the plan here as soon as it is approved.</span></div></div>
+    <div class="step"><i class="bi bi-circle"></i><div><b>Start learning</b><span>Modules, checklists, tasks and quizzes will appear here.</span></div></div>
+  </div>{% endif %}
+</div>
   <div class="ring" style="--p:0"><div class="ring-v">0%<small>complete</small></div></div>
 </section>
 {% else %}

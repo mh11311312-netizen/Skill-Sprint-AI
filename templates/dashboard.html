@@ -29,7 +29,7 @@
 <section class="hero">
   <div>
     <div class="eyebrow">Sitara Bank · Workspace overview</div>
-    <h2>{{ greeting }}, {{ current_user }} 👋</h2>
+    <h2>{{ greeting }}, {{ current_user }}</h2>
     <div class="meta"><i class="bi bi-clock" aria-hidden="true"></i>{{ today_label }} · {{ stats.employees }} employees in {{ stats.roles }} roles</div>
   </div>
   <div class="hero-right">
@@ -97,7 +97,6 @@
   <div class="col-lg-7"><div class="panel h-100 mb-0">
     <div class="panel-head"><h2>Plan generator health</h2><a href="{{ url_for('admin.logs') }}">View details →</a></div>
     <div class="well brain">
-      <span class="brain-dial"><i class="bi bi-cpu"></i></span>
       <div class="min-w-0">
         <div class="brain-title">Sitara Bank plan generator {% if health.last %}<span class="live">Active</span>{% endif %}</div>
         <div class="small muted">{{ stats.documents_active }} documents · {{ stats.requirements }} requirements · model {{ health.model }}, prompt v{{ health.prompt }}</div>

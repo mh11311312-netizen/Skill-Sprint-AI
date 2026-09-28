@@ -34,12 +34,21 @@ def index():
             count = db.requirements.count_documents({"roles": name, "active": True, "role_scope": "Role-Specific"})
             flash(f"Role '{name}' added. Matrix rebuilt: {count} role-specific requirement(s) found for it in the documents.", "success")
         return redirect(url_for("roles.index"))
+    counts = {g["_id"]: g for g in db.requirements.aggregate([
+        {"$match": {"active": True}}, {"$unwind": "$roles"},
+        {"$group": {"_id": "$roles", "total": {"$sum": 1},
+                    "mandatory": {"$sum": {"$cond": [{"$eq": ["$obligation", "Mandatory"]}, 1, 0]}},
+                    "specific": {"$sum": {"$cond": [{"$eq": ["$role_scope", "Role-Specific"]}, 1, 0]}}}}])}
+    staff = {g["_id"]: g["n"] for g in db.employees.aggregate([{"$group": {"_id": "$role", "n": {"$sum": 1}}}])}
     roles = []
-    for r in db.roles.find().sort("role_id", 1):
-        reqs = matrix_for_role(db, r["name"])
-        roles.append({**r, "total": len(reqs), "mandatory": sum(x["obligation"] == "Mandatory" for x in reqs),
-                      "specific": sum(x["role_scope"] == "Role-Specific" for x in reqs),
-                      "employees": db.employees.count_documents({"role": r["name"]})})
+    rq = {}
+    if request.args.get("search"):
+        rx = {"$regex": re.escape(request.args["search"]), "$options": "i"}
+        rq = {"$or": [{"name": rx}, {"department": rx}]}
+    for r in db.roles.find(rq).sort("role_id", 1):
+        c = counts.get(r["name"], {})
+        roles.append({**r, "total": c.get("total", 0), "mandatory": c.get("mandatory", 0),
+                      "specific": c.get("specific", 0), "employees": staff.get(r["name"], 0)})
     return render_template("roles.html", roles=roles)
 
 
@@ -50,7 +59,7 @@ def detail(name):
     role = db.roles.find_one({"name": name}) or abort(404)
     reqs = sorted(matrix_for_role(db, name), key=lambda r: (stage_index(r["due_stage"]), r["document_id"]))
     emps = list(db.employees.find({"role": name}))
-    plans = list(db.plans.find({"role": name}, {"plan_json": 0}).sort("created_at", -1))
+    plans = list(db.plans.find({"role": name}, {"plan_id": 1, "status": 1}).sort("created_at", -1))
     by_stage, by_doc = {}, {}
     for r in reqs:
         by_stage[r["due_stage"]] = by_stage.get(r["due_stage"], 0) + 1

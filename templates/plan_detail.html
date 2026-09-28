@@ -90,9 +90,15 @@ generated {{ plan.generation.generated_at|dt }} with {{ plan.generation.model }}
   {% if current_role in ('admin','reviewer','training_manager') %}
   <form method="post" action="{{ url_for('plans.review', plan_id=plan.plan_id) }}">{{ csrf() }}
     <textarea class="form-control mb-2" name="comment" rows="3" placeholder="Comment (required when approving a plan that is not Verified - this is recorded as an override)"></textarea>
-    <button class="btn btn-primary btn-sm" name="action" value="approve">Approve</button>
+    {% if v and v.scores.coverage < 100 %}<div class="alert alert-warning py-2 small mb-2"><span>Approval needs 100% mandatory coverage
+      (now {{ v.scores.coverage }}%, {{ v.scores.missing_count }} missing).</span></div>{% endif %}
+    <button class="btn btn-primary btn-sm" name="action" value="approve" {% if not v or v.scores.coverage < 100 %}disabled title="Needs 100% mandatory coverage"{% endif %}>Approve</button>
     <button class="btn btn-outline-danger btn-sm" name="action" value="reject">Reject</button>
     <button class="btn btn-outline-primary btn-sm" name="action" value="comment">Add comment</button></form>
+  {% if v and v.scores.missing_count %}
+  <form method="post" action="{{ url_for('plans.fill_missing', plan_id=plan.plan_id) }}" class="mt-3">{{ csrf() }}
+    <button class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-circle"></i>Add missing requirements ({{ v.scores.missing_count }})</button>
+    <span class="small muted ms-1">Asks the model to create modules only for the requirements Python found missing.</span></form>{% endif %}
   <h3 class="h6 mt-3">Regenerate selected modules</h3>
   <form method="post" action="{{ url_for('plans.regenerate', plan_id=plan.plan_id) }}">{{ csrf() }}
     {% for m in plan.plan_json.modules %}<label class="me-2 small"><input type="checkbox" name="module_ids" value="{{ m.module_id }}"> {{ m.module_id }}</label>{% endfor %}
@@ -113,6 +119,7 @@ generated {{ plan.generation.generated_at|dt }} with {{ plan.generation.model }}
 <div class="tab-pane fade" id="t-gen"><div class="panel"><h2>Generation metadata</h2>
   <table class="table"><tr><td>Model</td><td>{{ plan.generation.model }}</td></tr><tr><td>Prompt</td><td>{{ plan.generation.prompt_template }} v{{ plan.generation.prompt_version }}</td></tr>
   <tr><td>Temperature</td><td>{{ plan.generation.temperature }}</td></tr><tr><td>Attempts</td><td>{{ plan.generation.attempts }}</td></tr>
+  <tr><td>Generation time</td><td>{{ plan.generation.seconds or '-' }} s ({{ plan.generation.batches or 1 }} requests, {{ plan.generation.gap_fill_rounds or 0 }} gap-fill round)</td></tr>
   <tr><td>Source clauses sent</td><td>{{ plan.generation.source_clause_count }}</td></tr>
   <tr><td>Source versions</td><td class="small">{% for d, ver in plan.generation.source_versions.items() %}{{ d }} v{{ ver }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr></table>
   <h3 class="h6">API attempts</h3><table class="table table-sm"><tr><th>At</th><th>Purpose</th><th>Attempt</th><th>OK</th><th>Seconds</th><th>Error</th></tr>

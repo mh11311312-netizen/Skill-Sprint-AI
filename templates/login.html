@@ -10,7 +10,7 @@
 <body>
 <main class="login-simple">
   <div class="login-box">
-    {{ logo(url_for('auth.login'), 170) }}
+    {{ logo(url_for('main.about'), 170) }}
     <h1 class="login-title">Sign in</h1>
     <p class="muted mb-4">Use the account given to you by HR or your administrator.</p>
     {% with msgs = get_flashed_messages(with_categories=true) %}{% for c, m in msgs %}<div class="alert alert-{{ c }}" role="alert"><span>{{ m }}</span></div>{% endfor %}{% endwith %}
@@ -19,10 +19,10 @@
       <label class="form-label" for="u">Username</label>
       <input id="u" name="username" class="form-control mb-3" autocomplete="username" required autofocus>
       <label class="form-label" for="p">Password</label>
-      <input id="p" name="password" type="password" class="form-control mb-4" autocomplete="current-password" required>
+      <div class="pw-wrap"><input id="p" name="password" type="password" class="form-control mb-4" autocomplete="current-password" required><button type="button" class="pw-eye" aria-label="Show password" data-target="p" onclick="var i=document.getElementById(this.dataset.target);var t=i.type==='password';i.type=t?'text':'password';this.classList.toggle('on',t);this.setAttribute('aria-pressed',t);this.title=t?'Hide password':'Show password';"><i class="bi bi-eye" aria-hidden="true"></i><i class="bi bi-eye-slash" aria-hidden="true"></i></button></div>
       <button class="btn btn-primary w-100">Sign in</button>
     </form>
-    <p class="login-note">Internal system of Sitara Bank Ltd. Sign-ins are recorded. If you cannot sign in, contact the IT service desk.</p>
+    <p class="login-note">Internal system of Sitara Bank Ltd. Sign-ins are recorded. If you cannot sign in, contact the IT service desk.<br>New employee? <a href="{{ url_for('auth.signup') }}">Create your account</a> · <a href="{{ url_for('main.about') }}">About SkillSprint</a></p>
   </div>
 </main>
 </body></html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3d3028">
+  <title>About · SkillSprint · Sitara Bank</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+{% from "_macros.html" import logo %}
+{% set signed_in = session.get('username') %}
+
+<header class="site-nav">
+  <div class="site-inner">
+    {{ logo(url_for('main.about'), 140) }}
+    <nav class="site-links" aria-label="Page sections">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#people">Who uses it</a>
+      <a href="#security">Security</a>
+    </nav>
+    {% if signed_in %}
+      <a class="btn btn-primary" href="{{ url_for('main.home') }}"><i class="bi bi-arrow-right-circle"></i>Go to workspace</a>
+    {% else %}
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="{{ url_for('auth.signup') }}"><i class="bi bi-person-plus"></i>Sign up</a>
+        <a class="btn btn-primary" href="{{ url_for('auth.login') }}"><i class="bi bi-box-arrow-in-right"></i>Sign in</a>
+      </div>
+    {% endif %}
+  </div>
+</header>
+
+<main>
+  <section class="site-inner about-hero">
+    <div class="about-hero-text">
+      <div class="label-caps mb-2">Sitara Bank Ltd. · Internal onboarding system</div>
+      <h1>New staff onboarding, built from the bank's own documents.</h1>
+      <p>SkillSprint reads our approved policies, SOPs and role descriptions, and prepares a personal onboarding plan for
+        every new joiner: what to learn, what to complete, and by when. Every rule in a plan points back to the exact
+        document and section it came from, and every plan is checked before anyone relies on it.</p>
+      <div class="d-flex gap-2 flex-wrap">
+        {% if signed_in %}<a class="btn btn-primary btn-lg" href="{{ url_for('main.home') }}">Go to workspace</a>
+        {% else %}<a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}">Sign in</a>
+        <a class="btn btn-outline-primary btn-lg" href="{{ url_for('auth.signup') }}">New employee? Sign up</a>{% endif %}
+        {% if signed_in %}<a class="btn btn-outline-primary btn-lg" href="#how">How it works</a>{% endif %}
+      </div>
+    </div>
+    <aside class="panel about-card mb-0" aria-label="What a plan contains">
+      <div class="label-caps mb-3">What a new joiner receives</div>
+      <ul class="about-list">
+        <li><i class="bi bi-signpost-split"></i><div><b>A staged learning path</b><span>Day 1, Week 1, Week 2, and the first 30, 60 and 90 days</span></div></li>
+        <li><i class="bi bi-journal-text"></i><div><b>Modules with study material</b><span>The actual policy text, with document and section numbers</span></div></li>
+        <li><i class="bi bi-list-check"></i><div><b>Checklists and practical tasks</b><span>Including scenario tasks for day-to-day work</span></div></li>
+        <li><i class="bi bi-patch-question"></i><div><b>Short quizzes</b><span>With a pass mark and extra practice for weak areas</span></div></li>
+      </ul>
+    </aside>
+  </section>
+
+  <section class="site-inner about-section" id="how">
+    <h2>How it works</h2>
+    <p class="about-lead">Two separate checks stand behind every plan: one writes it, the other verifies it.</p>
+    <ol class="about-steps">
+      <li><span>1</span><div><b>Documents are uploaded</b><p>HR and Compliance upload policies, SOPs, FAQs and role descriptions as PDF or Word files. Old versions are kept but not used.</p></div></li>
+      <li><span>2</span><div><b>Rules are extracted</b><p>The system turns every "must", "should" and "may" into a requirement, linked to the roles it applies to. Conflicting documents are settled by the bank's precedence rules.</p></div></li>
+      <li><span>3</span><div><b>A plan is drafted</b><p>A language model drafts a personal plan for the employee's role and experience, using only the approved clauses.</p></div></li>
+      <li><span>4</span><div><b>The plan is checked</b><p>A separate rule-based check compares the draft against the requirement list: missing items, wrong deadlines, invented rules and outdated sources are flagged.</p></div></li>
+      <li><span>5</span><div><b>A reviewer signs off</b><p>A trainer or reviewer approves, edits or rejects the plan. Every decision is kept in the audit trail.</p></div></li>
+      <li><span>6</span><div><b>The employee learns</b><p>The new joiner works through modules, checklists, tasks and quizzes, and managers can see progress by role and department.</p></div></li>
+    </ol>
+  </section>
+
+  <section class="site-inner about-section" id="features">
+    <h2>Features</h2>
+    <div class="row g-3">
+      {% for icon, title, text in [
+        ('file-earmark-check', 'Document control', 'File checks, version history, expiry dates and a clear record of which version is active.'),
+        ('diagram-3', 'Role requirement matrix', 'Every mandatory, recommended and optional rule for each of the bank\'s roles, in one table.'),
+        ('link-45deg', 'Source traceability', 'Each checklist item, task and quiz question cites the document and section behind it.'),
+        ('arrow-repeat', 'Policy change impact', 'When a policy is revised, the plans and quiz questions it affects are found and updated.'),
+        ('graph-up', 'Progress and reports', 'Dashboards by role and department, and reports you can export to Excel, CSV or PDF.'),
+        ('inbox', 'Review queue', 'Plans that fail a check wait for a person to decide, with the reasons listed line by line.')] %}
+      <div class="col-md-6 col-lg-4"><div class="panel h-100 mb-0 about-feature">
+        <i class="bi bi-{{ icon }}"></i><h3>{{ title }}</h3><p>{{ text }}</p></div></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="site-inner about-section" id="people">
+    <h2>Who uses it</h2>
+    <div class="row g-3">
+      {% for title, text in [
+        ('Administrators', 'Upload documents, manage roles and users, and watch source health and security events.'),
+        ('Trainers', 'Add employees and generate their plans.'),
+        ('Reviewers', 'Approve, correct or reject plans, and record the reason for any override.'),
+        ('Employees', 'Follow their own plan, read the study material and take the quizzes.')] %}
+      <div class="col-md-6 col-lg-3"><div class="about-role"><b>{{ title }}</b><p>{{ text }}</p></div></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="site-inner about-section" id="security">
+    <div class="panel mb-0 about-security">
+      <div>
+        <h2>Security</h2>
+        <p class="about-lead mb-0">Uploaded documents are treated as information, never as instructions. Text that tries to
+          give the system orders, or is hidden in white or tiny print, is quarantined and never reaches the language model.
+          Access depends on your role, passwords are stored encrypted, and every sign-in and decision is logged.</p>
+      </div>
+      {% if not signed_in %}<a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}"><i class="bi bi-box-arrow-in-right"></i>Sign in</a>{% endif %}
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="site-inner"><span>Sitara Bank Ltd. · Karachi</span><span>Internal system. For access, contact the IT service desk.</span></div>
+</footer>
+</body>
+</html>

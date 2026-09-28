@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block heading %}Search{% endblock %}
+{% block subheading %}<p class="sub">Employees, roles, documents, requirements, plan modules and statuses</p>{% endblock %}
+{% block content %}
+<div class="panel">
+  <form method="get" class="d-flex gap-2">
+    <label class="visually-hidden" for="sq">Search</label>
+    <input id="sq" class="form-control" name="q" value="{{ q }}" placeholder="Type a name, ID, role, document, module title or status (e.g. Pending Review)" autofocus>
+    <button class="btn btn-primary"><i class="bi bi-search"></i>Search</button>
+  </form>
+  {% if q and q|length < 2 %}<p class="small muted mt-2 mb-0">Type at least 2 characters.</p>
+  {% elif q %}<p class="small muted mt-2 mb-0">{{ total }} result{{ 's' if total != 1 }} for "{{ q }}"</p>{% endif %}
+</div>
+
+{% macro section(title, items) -%}
+  {% if items %}<div class="panel"><h2>{{ title }} <span class="small muted">({{ items|length }})</span></h2>
+    <div class="table-wrap"><table class="table align-middle">{{ caller() }}</table></div></div>{% endif %}
+{%- endmacro %}
+
+{% call section("Employees", results.employees) %}
+  <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Department</th><th>Progress</th></tr></thead>
+  <tbody>{% for e in results.employees %}<tr><td class="text-nowrap"><a class="fw-bold" href="{{ url_for('employees.detail', employee_id=e.employee_id) }}">{{ e.employee_id }}</a></td>
+  <td>{{ e.full_name }}</td><td>{{ e.role }}</td><td>{{ e.department }}</td><td>{{ stamp(e.training_status or 'Not Started') }}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+{% call section("Roles", results.roles) %}
+  <thead><tr><th>Role</th><th>Department</th><th>Description</th></tr></thead>
+  <tbody>{% for r in results.roles %}<tr><td><a class="fw-semibold" href="{{ url_for('roles.detail', name=r.name) }}">{{ r.name }}</a></td>
+  <td>{{ r.department }}</td><td class="small">{{ r.description }}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+{% call section("Documents", results.documents) %}
+  <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Version</th><th>Status</th><th>Trust</th></tr></thead>
+  <tbody>{% for d in results.documents %}<tr><td class="text-nowrap"><a class="fw-bold" href="{{ url_for('documents.detail', doc_key=d.doc_key) }}">{{ d.document_id }}</a></td>
+  <td>{{ d.title }}</td><td>{{ d.category }}</td><td>{{ d.version }}</td><td>{{ stamp(d.status) }}</td><td>{{ stamp(d.trust) }}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+{% call section("Plan modules", results.modules) %}
+  <thead><tr><th>Module</th><th>Stage</th><th>Plan</th><th>Employee</th><th>Plan status</th></tr></thead>
+  <tbody>{% for x in results.modules %}<tr><td><b>{{ x.module.module_id }}</b> · {{ x.module.module_title }}</td><td class="small">{{ x.module.stage }}</td>
+  <td class="text-nowrap"><a href="{{ url_for('plans.detail', plan_id=x.plan.plan_id) }}">{{ x.plan.plan_id }}</a></td><td>{{ x.plan.employee_id }} · {{ x.plan.role }}</td>
+  <td>{{ stamp(x.plan.status) }}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+{% call section("Plans (by ID, employee or status)", results.plans) %}
+  <thead><tr><th>Plan</th><th>Employee</th><th>Role</th><th>Status</th><th>Verification</th></tr></thead>
+  <tbody>{% for p in results.plans %}<tr><td class="text-nowrap"><a href="{{ url_for('plans.detail', plan_id=p.plan_id) }}">{{ p.plan_id }}</a></td>
+  <td>{{ p.employee_id }}</td><td>{{ p.role }}</td><td>{{ stamp(p.status) }}</td><td>{% if p.validation %}{{ stamp(p.validation.status) }}{% endif %}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+{% call section("Requirements", results.requirements) %}
+  <thead><tr><th>ID</th><th>Requirement</th><th>Obligation</th><th>State</th></tr></thead>
+  <tbody>{% for r in results.requirements %}<tr><td><a class="src" href="{{ url_for('documents.detail', doc_key=r.document_id ~ '@' ~ r.version) }}#s{{ r.section_id }}">{{ r.requirement_id }}</a></td>
+  <td class="small">{{ r.text }}</td><td>{{ stamp(r.obligation) }}</td><td>{% if r.active %}{{ stamp('Active') }}{% elif r.overridden_by %}<span class="stamp stamp-bad">Overridden by {{ r.overridden_by }}</span>{% elif r.duplicate_of %}<span class="stamp stamp-muted">Duplicate of {{ r.duplicate_of }}</span>{% else %}{{ stamp('Inactive') }}{% endif %}</td></tr>{% endfor %}</tbody>
+{% endcall %}
+
+{% if q and q|length >= 2 and not total %}<div class="panel"><p class="muted m-0">Nothing found. Try a shorter word, an ID such as EMP-002 or POL-04, or a status such as Approved.</p></div>{% endif %}
+{% endblock %}

@@ -43,3 +43,16 @@ def test_api_errors_are_wrapped(monkeypatch):
     monkeypatch.setattr(c.client.chat.completions, "create", boom)
     with pytest.raises(GenAIError, match="invalid api key"):
         c.generate("s", "p", 0.2)
+
+
+def test_reasoning_effort_sent_only_when_configured(monkeypatch):
+    seen = {}
+    c = OpenAIClient("sk-test", "gpt-5.6-luna", reasoning_effort="low")
+    monkeypatch.setattr(c.client.chat.completions, "create", lambda **kw: seen.update(kw) or _fake_response("{}"))
+    c.generate("s", "p", 0.2)
+    assert seen["reasoning_effort"] == "low"
+    seen.clear()
+    c2 = OpenAIClient("sk-test", "gpt-5.6-luna")
+    monkeypatch.setattr(c2.client.chat.completions, "create", lambda **kw: seen.update(kw) or _fake_response("{}"))
+    c2.generate("s", "p", 0.2)
+    assert "reasoning_effort" not in seen

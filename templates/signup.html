@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#3d3028">
+<title>Create your account · SkillSprint</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet"></head>
+{% from "_macros.html" import logo %}
+<body>
+<main class="login-simple">
+  <div class="login-box">
+    {{ logo(url_for('main.about'), 170) }}
+    <h1 class="login-title">Create your account</h1>
+    <p class="muted mb-4">For new Sitara Bank employees. Use the Employee ID and joining date from your HR offer letter.</p>
+    {% with msgs = get_flashed_messages(with_categories=true) %}{% for c, m in msgs %}<div class="alert alert-{{ c }}" role="alert"><span>{{ m }}</span></div>{% endfor %}{% endwith %}
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <label class="form-label" for="eid">Employee ID</label>
+      <input id="eid" name="employee_id" class="form-control mb-3" placeholder="EMP-016" value="{{ request.form.employee_id or '' }}" required autofocus>
+      <label class="form-label" for="jd">Joining date</label>
+      <input id="jd" name="joining_date" type="date" class="form-control mb-4" value="{{ request.form.joining_date or '' }}" required>
+      <button class="btn btn-primary w-100">Create account</button>
+    </form>
+    <p class="login-note">Your first password will be <b>Employee@123</b>. You will choose your own password the first time you sign in.<br>
+      Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a> · <a href="{{ url_for('main.about') }}">About SkillSprint</a></p>
+  </div>
+</main>
+</body></html>

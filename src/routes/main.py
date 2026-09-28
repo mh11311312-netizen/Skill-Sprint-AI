@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, redirect, url_for, session
+import re
+from flask import Blueprint, render_template, redirect, url_for, session, request
 from database.db import get_db
 from security.auth import login_required, roles_required
 from src.routes.helpers import STAFF
@@ -7,18 +8,28 @@ bp = Blueprint("main", __name__)
 
 
 @bp.route("/")
-@login_required
 def home():
+    """Visitors who are not signed in see the About page; signed-in users go to their workspace."""
+    if "username" not in session:
+        return render_template("about.html")
     if session.get("app_role") == "employee":
         return redirect(url_for("learner.home"))
     return redirect(url_for("main.dashboard"))
+
+
+@bp.route("/about")
+def about():
+    return render_template("about.html")
 
 
 @bp.route("/dashboard")
 @roles_required(*STAFF)
 def dashboard():
     db = get_db()
-    plans = list(db.plans.find({}, {"plan_json": 0}))
+    # only the fields the dashboard shows (the full plan JSON and validation rows are large)
+    plans = list(db.plans.find({}, {"plan_id": 1, "employee_id": 1, "role": 1, "status": 1, "created_at": 1,
+                                    "approved_at": 1, "generation.model": 1, "generation.prompt_version": 1,
+                                    "validation.status": 1, "validation.scores": 1}))
     by_status = {}
     for p in plans:
         by_status[p["status"]] = by_status.get(p["status"], 0) + 1
@@ -28,23 +39,32 @@ def dashboard():
     training = {}
     for e in emps:
         training[e.get("training_status", "Not Started")] = training.get(e.get("training_status", "Not Started"), 0) + 1
+    # one aggregation instead of one count per role
+    mandatory_by_role = {g["_id"]: g["n"] for g in db.requirements.aggregate([
+        {"$match": {"active": True, "obligation": "Mandatory"}}, {"$unwind": "$roles"},
+        {"$group": {"_id": "$roles", "n": {"$sum": 1}}}])}
+    doc_status = {g["_id"]: g["n"] for g in db.documents.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}])}
+    doc_untrusted = db.documents.count_documents({"trust": {"$ne": "Trusted"}})
+    req_counts = {g["_id"]: g["n"] for g in db.requirements.aggregate([
+        {"$match": {"active": True}}, {"$group": {"_id": "$obligation", "n": {"$sum": 1}}}])}
+    roles = list(db.roles.find({}, {"name": 1, "role_id": 1}).sort("role_id", 1))
     role_stats = []
-    for r in db.roles.find().sort("role_id", 1):
+    for r in roles:
         rp = [p for p in validated if p["role"] == r["name"]]
         role_stats.append({"role": r["name"],
-                           "mandatory": db.requirements.count_documents({"roles": r["name"], "active": True, "obligation": "Mandatory"}),
+                           "mandatory": mandatory_by_role.get(r["name"], 0),
                            "employees": sum(1 for e in emps if e["role"] == r["name"]),
                            "coverage": round(sum(p["validation"]["scores"]["coverage"] for p in rp) / len(rp), 1) if rp else None,
                            "progress": round(sum(e.get("progress_pct", 0) for e in emps if e["role"] == r["name"]) /
                                              max(1, sum(1 for e in emps if e["role"] == r["name"])), 1)})
     stats = {
-        "documents_active": db.documents.count_documents({"status": "Active"}),
-        "documents_superseded": db.documents.count_documents({"status": "Superseded"}),
-        "documents_flagged": db.documents.count_documents({"trust": {"$ne": "Trusted"}}),
-        "requirements": db.requirements.count_documents({"active": True}),
-        "mandatory": db.requirements.count_documents({"active": True, "obligation": "Mandatory"}),
+        "documents_active": doc_status.get("Active", 0),
+        "documents_superseded": doc_status.get("Superseded", 0),
+        "documents_flagged": doc_untrusted,
+        "requirements": sum(req_counts.values()),
+        "mandatory": req_counts.get("Mandatory", 0),
         "conflicts": db.conflicts.count_documents({"kind": "conflict", "type": {"$ne": "Scope-specific rule"}}),
-        "roles": db.roles.count_documents({}), "employees": len(emps), "plans": len(plans),
+        "roles": len(roles), "employees": len(emps), "plans": len(plans),
         "pending_review": sum(1 for p in plans if p["status"] in ("Pending Review", "Outdated")),
         "avg_coverage": avg("coverage"), "avg_traceability": avg("traceability"),
         "security_events": db.security_events.count_documents({}),
@@ -116,3 +136,36 @@ def dashboard():
                            departments=departments, recent_docs=recent_docs, alerts=alerts,
                            training_rows=training_rows, health=health, greeting=greeting,
                            today_label=today.strftime("%A, %d %B %Y"))
+
+
+@bp.route("/search")
+@roles_required(*STAFF)
+def search():
+    """One search box for employees, roles, documents, requirements, plan modules and statuses."""
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    results = {"employees": [], "roles": [], "documents": [], "requirements": [], "modules": [], "plans": []}
+    if len(q) >= 2:
+        rx = {"$regex": re.escape(q), "$options": "i"}
+        results["employees"] = list(db.employees.find(
+            {"$or": [{"full_name": rx}, {"employee_id": rx}, {"role": rx}, {"department": rx}, {"training_status": rx}]}).limit(25))
+        results["roles"] = list(db.roles.find({"$or": [{"name": rx}, {"department": rx}, {"description": rx}]}).limit(25))
+        results["documents"] = list(db.documents.find(
+            {"$or": [{"document_id": rx}, {"title": rx}, {"category": rx}, {"status": rx}, {"trust": rx}]},
+            {"doc_key": 1, "document_id": 1, "title": 1, "version": 1, "status": 1, "trust": 1, "category": 1}).limit(25))
+        results["requirements"] = list(db.requirements.find(
+            {"$or": [{"requirement_id": rx}, {"text": rx}]},
+            {"requirement_id": 1, "text": 1, "document_id": 1, "version": 1, "section_id": 1, "obligation": 1, "active": 1,
+             "overridden_by": 1, "duplicate_of": 1}).limit(25))
+        for p in db.plans.find({"$or": [{"plan_json.modules.module_title": rx}, {"status": rx}, {"validation.status": rx},
+                                        {"plan_id": rx}, {"employee_id": rx}]},
+                               {"plan_id": 1, "employee_id": 1, "role": 1, "status": 1, "validation.status": 1,
+                                "plan_json.modules.module_id": 1, "plan_json.modules.module_title": 1,
+                                "plan_json.modules.stage": 1}).limit(50):
+            hits = [m for m in p.get("plan_json", {}).get("modules", []) if re.search(re.escape(q), m.get("module_title", ""), re.I)]
+            for m in hits[:10]:
+                results["modules"].append({"plan": p, "module": m})
+            if not hits:
+                results["plans"].append(p)
+    total = sum(len(v) for v in results.values())
+    return render_template("search.html", q=q, results=results, total=total)
