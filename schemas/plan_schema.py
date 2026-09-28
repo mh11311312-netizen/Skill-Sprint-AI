@@ -60,11 +60,25 @@ class Assessment(BaseModel):
     rubric: List[RubricItem] = []
 
 
+# Models sometimes answer with the SOURCE DOCUMENT's category (SOP, FAQ, Handbook ...) instead of a module category.
+# These words have one obvious meaning, so they are mapped instead of wasting a retry; anything else is still rejected.
+MODULE_CATEGORY_ALIASES = {"sop": "Process", "standard operating procedure": "Process", "process manual": "Process", "procedure": "Process",
+                           "guideline": "Process", "handbook": "Orientation", "employee handbook": "Orientation", "orientation": "Orientation",
+                           "faq": "Policy", "policy": "Policy", "compliance": "Compliance", "regulatory": "Compliance",
+                           "role description": "Role Skills", "role skills": "Role Skills", "role skill": "Role Skills", "skills": "Role Skills",
+                           "process": "Process"}
+
+
 class Module(BaseModel):
     module_id: str = Field(pattern=ID)
     module_title: str = Field(min_length=3)
     category: Literal["Policy", "Compliance", "Process", "Role Skills", "Orientation"]
     purpose: str
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _map_category(cls, v):
+        return MODULE_CATEGORY_ALIASES.get(str(v).strip().lower(), v) if isinstance(v, str) else v
     stage: Stage
     mandatory: bool
     priority: Literal["High", "Medium", "Low"]

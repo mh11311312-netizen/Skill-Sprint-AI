@@ -38,13 +38,20 @@ def index():
 def generate(employee_id):
     db = get_db()
     e = db.employees.find_one({"employee_id": employee_id}) or abort(404)
+    import time as _time
+    clicked = _time.time()                      # measured from the click, so the time shown is the time the user waited
     try:
         plan = create_plan(db, e, session["username"])
-        result = run_validation(db, plan, session["username"])
-        late = plan["generation"].get("late_requests", 0)
-        flash(f"Plan generated in {plan['generation'].get('seconds', '?')} s and validated: {result['status']} "
+        fresh = db.plans.find_one({"plan_id": plan["plan_id"]})
+        # when parts outlived the budget the plan was already validated inside create_plan
+        result = fresh.get("validation") if plan["generation"].get("background_requests") else None
+        result = result or run_validation(db, fresh, session["username"])
+        late = fresh["generation"].get("late_requests", 0)
+        waited = round(_time.time() - clicked, 1)
+        db.plans.update_one({"plan_id": plan["plan_id"]}, {"$set": {"generation.response_seconds": waited}})
+        flash(f"Plan generated and validated in {waited} s: {result['status']} "
               f"(coverage {result['scores']['coverage']}%, traceability {result['scores']['traceability']}%)."
-              + (f" {late} request(s) did not finish within the time limit - use 'Add missing requirements'." if late else ""), "success" if result["status"] == "Verified" else "warning")
+              + (f" {late} part(s) are still being generated and will be added automatically - this page refreshes by itself." if late else ""), "success" if result["status"] == "Verified" else "warning")
         return redirect(url_for("plans.detail", plan_id=plan["plan_id"]))
     except GenerationFailed as ex:
         flash(str(ex), "danger")
@@ -165,12 +172,15 @@ def regenerate(plan_id):
         return redirect(url_for("plans.detail", plan_id=plan_id))
     reason = request.form.get("reason") or "Reviewer requested regeneration"
     try:
-        regenerate_modules(db, plan, ids, reason, session["username"])
+        changed, failed = regenerate_modules(db, plan, ids, reason, session["username"])
         plan = db.plans.find_one({"_id": plan["_id"]})
         if plan["status"] == "Outdated":
             db.plans.update_one({"_id": plan["_id"]}, {"$set": {"status": "Pending Review"}})
         r = run_validation(db, db.plans.find_one({"_id": plan["_id"]}), session["username"])
-        flash(f"Regenerated {', '.join(ids)} only. Re-validation: {r['status']}.", "success")
+        msg = f"Regenerated {', '.join(c['module_id'] for c in changed)}. Re-validation: {r['status']}."
+        if failed:
+            msg += " Not regenerated (ran out of time): " + ", ".join(mid for mid, _ in failed) + " - select fewer modules or try again."
+        flash(msg, "warning" if failed else "success")
     except GenerationFailed as ex:
         flash(str(ex), "danger")
     return redirect(url_for("plans.detail", plan_id=plan_id))
@@ -203,7 +213,7 @@ def consistency(plan_id):
     plan = _plan(plan_id)
     e = db.employees.find_one({"employee_id": plan["employee_id"]})
     try:
-        second, _ = generate_plan_json(db, e, f"{plan_id}-consistency")
+        second, _ = generate_plan_json(db, e, f"{plan_id}-consistency", budget=0)
         result = compare_generations(plan["original_plan_json"], second)
         result["at"] = now()
         db.plans.update_one({"_id": plan["_id"]}, {"$set": {"consistency": result}})

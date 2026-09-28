@@ -58,7 +58,23 @@ class OpenAIClient:
         try:
             resp = self.client.chat.completions.create(**args)
         except Exception as e:                            # invalid key, quota, timeout, unknown model ...
-            raise GenAIError(f"{e.__class__.__name__}: {str(e)[:300]}")
+            if "reasoning_effort" in args and "reasoning" in str(e).lower():
+                # this model does not accept the configured effort value: fall back to "low", then to the default
+                for fallback in (["low"] if args["reasoning_effort"] != "low" else []) + [None]:
+                    if fallback:
+                        args["reasoning_effort"] = fallback
+                    else:
+                        args.pop("reasoning_effort", None)
+                    try:
+                        resp = self.client.chat.completions.create(**args)
+                        self.reasoning_effort = fallback or ""
+                        break
+                    except Exception as e2:
+                        e = e2
+                else:
+                    raise GenAIError(f"{e.__class__.__name__}: {str(e)[:300]}")
+            else:
+                raise GenAIError(f"{e.__class__.__name__}: {str(e)[:300]}")
         choice = resp.choices[0]
         text = choice.message.content
         if choice.finish_reason == "length":

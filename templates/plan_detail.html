@@ -4,6 +4,11 @@
 {% block subheading %}<p class="sub">{{ plan.role }} · {{ employee.full_name if employee else plan.employee_id }} · {{ plan.experience_level }} ·
 generated {{ plan.generation.generated_at|dt }} with {{ plan.generation.model }}, prompt {{ plan.generation.prompt_template }} v{{ plan.generation.prompt_version }}</p>{% endblock %}
 {% block content %}
+{% if plan.generation and plan.generation.late_requests and plan.generation.background_requests %}
+<div class="alert alert-info d-flex align-items-center gap-2" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+  <span>{{ plan.generation.late_requests }} part(s) of this plan are still being generated. They are added and re-validated automatically; this page refreshes every 8 seconds.</span></div>
+<script>setTimeout(function () { location.reload(); }, 8000);</script>
+{% endif %}
 {% if plan.outdated %}<div class="alert alert-warning small"><b>Outdated:</b> {{ plan.outdated.document_id }} changed from v{{ plan.outdated.old_version }} to v{{ plan.outdated.new_version }}
 (sections {{ plan.outdated.changed_sections|join(', ') }}). Affected modules: {{ plan.outdated.modules|join(', ') }}; questions: {{ plan.outdated.questions|join(', ') or 'none' }}.
 <form method="post" action="{{ url_for('plans.regenerate', plan_id=plan.plan_id) }}" class="d-inline">{{ csrf() }}
@@ -119,10 +124,47 @@ generated {{ plan.generation.generated_at|dt }} with {{ plan.generation.model }}
 <div class="tab-pane fade" id="t-gen"><div class="panel"><h2>Generation metadata</h2>
   <table class="table"><tr><td>Model</td><td>{{ plan.generation.model }}</td></tr><tr><td>Prompt</td><td>{{ plan.generation.prompt_template }} v{{ plan.generation.prompt_version }}</td></tr>
   <tr><td>Temperature</td><td>{{ plan.generation.temperature }}</td></tr><tr><td>Attempts</td><td>{{ plan.generation.attempts }}</td></tr>
-  <tr><td>Generation time</td><td>{{ plan.generation.seconds or '-' }} s ({{ plan.generation.batches or 1 }} requests, {{ plan.generation.gap_fill_rounds or 0 }} gap-fill round)</td></tr>
+  <tr><td>Generation time</td><td>{{ plan.generation.response_seconds or plan.generation.seconds or '-' }} s to the first validated plan ({{ plan.generation.batches or 1 }} requests){% if plan.generation.seconds_total %}; complete after {{ plan.generation.seconds_total }} s ({{ plan.generation.completed_in_background or 0 }} part(s) finished in the background){% endif %}</td></tr>
   <tr><td>Source clauses sent</td><td>{{ plan.generation.source_clause_count }}</td></tr>
   <tr><td>Source versions</td><td class="small">{% for d, ver in plan.generation.source_versions.items() %}{{ d }} v{{ ver }}{% if not loop.last %}, {% endif %}{% endfor %}</td></tr></table>
   <h3 class="h6">API attempts</h3><table class="table table-sm"><tr><th>At</th><th>Purpose</th><th>Attempt</th><th>OK</th><th>Seconds</th><th>Error</th></tr>
   {% for l in logs %}<tr><td>{{ l.at|dt }}</td><td>{{ l.purpose }}</td><td>{{ l.attempt }}</td><td>{{ stamp('Yes' if l.ok else 'No') }}</td><td>{{ l.seconds }}</td><td class="small">{{ l.error or '' }}</td></tr>{% endfor %}</table></div></div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Keep the visible tab in the URL hash, so a form that redirects back to "#comparison" (etc.)
+// actually shows that tab instead of always landing on the first one (Modules).
+(function () {
+  function activate(hash) {
+    if (!hash) return false;
+    var btn = document.querySelector('.nav-link[data-bs-target="' + hash + '"]');
+    if (!btn) return false;
+    bootstrap.Tab.getOrCreateInstance(btn).show();
+    return true;
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    activate(window.location.hash);
+    window.addEventListener('hashchange', function () { activate(window.location.hash); });
+    document.querySelectorAll('.nav-link[data-bs-toggle="tab"]').forEach(function (btn) {
+      btn.addEventListener('shown.bs.tab', function (e) {
+        history.replaceState(null, '', e.target.getAttribute('data-bs-target'));
+      });
+    });
+    // Every form inside the tabbed area returns to whichever tab was open when it was submitted,
+    // not necessarily the tab the server assumed.
+    document.querySelectorAll('.tab-content form').forEach(function (f) {
+      f.addEventListener('submit', function () {
+        var active = document.querySelector('.tab-pane.active');
+        if (active) {
+          var url = new URL(f.action, window.location.href);
+          url.hash = '#' + active.id;
+          f.action = url.pathname + url.search + url.hash;
+        }
+      });
+    });
+  });
+})();
+</script>
 {% endblock %}

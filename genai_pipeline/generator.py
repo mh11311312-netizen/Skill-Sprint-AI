@@ -6,10 +6,11 @@ import math
 import os
 import secrets
 import re
+import threading
 import time
 from datetime import datetime
 import yaml
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from flask import current_app
 from pydantic import ValidationError
 from config.loader import load_yaml
@@ -140,6 +141,19 @@ OBLIGATION_RX = re.compile(r"\b(must|shall|required|mandatory)\b", re.I)
 RULE_RX = re.compile(r"\b(must|shall|required|mandatory|should|may)\b")
 
 
+def _is_requirement(text):
+    """Clauses the plan must cover. GENAI_COVER_ALL=1 (default): every requirement - mandatory, recommended and
+    optional; purely informational sentences are never required. GENAI_COVER_ALL=0: mandatory clauses only."""
+    t = ex.clean_text(text)
+    if _setting("GENAI_COVER_ALL", 1):
+        return ex.obligation(t) != "Informational"
+    return bool(OBLIGATION_RX.search(t))
+
+
+def _compact():
+    return bool(_setting("GENAI_COMPACT_OUTPUT", 1))
+
+
 def _setting(name, default):
     """Reads a number from the app config or .env (0 is a valid value)."""
     value = current_app.config.get(name)
@@ -207,15 +221,23 @@ def _batch_prompt(tpl, employee, batch, number, total):
     values = {"company": COMPANY, "employee_id": employee["employee_id"], "role": employee["role"],
               "department": employee.get("department", ""), "experience_level": employee.get("experience_level", "Beginner"),
               "joining_date": employee.get("joining_date", ""), "previous_experience": employee.get("previous_experience", "None"),
-              "stages": stage_names(), "min_modules": 1, "max_modules": max(2, math.ceil(clauses / 6)),
+              "stages": stage_names(), "min_modules": 1,
+              "max_modules": (max(1, sum(1 for _, rows in batch if any(not c.get("_reference") for c in rows))) if _compact()
+                              else max(2, math.ceil(clauses / 6))),
               "schema_example": plan_example(), "sources": format_sources(batch)}
     # checklist of the clauses in THIS request that contain must/shall/required (read from the prompt sources
     # themselves, not from the Python matrix) - small models cover far more when given an explicit list
     must_ids = [f"{d['document_id']}-{c['section_id']}" for d, rows in batch for c in rows
-                if not c.get("_reference") and OBLIGATION_RX.search(ex.clean_text(c["text"]))]
+                if not c.get("_reference") and _is_requirement(c["text"])]
     note = (f"\n\nBATCH {number} OF {total}: the other documents are handled in separate requests. Use only these sources.")
+    if _compact():
+        # the answer's length decides how long the model takes, so plans are written in a compact form
+        note += ("\nCOMPACT OUTPUT (speed): write ONE module per source document in this batch. In each: exactly 1 learning objective, 1 checklist "
+                 "item, 1 practical task and 2 quiz questions; key_concepts and learning_activities as empty lists; purpose, "
+                 "descriptions, questions and explanations in at most 15 words each. requirements_covered must still list "
+                 "EVERY clause on the coverage checklist - coverage matters more than anything else.")
     if must_ids:
-        note += ("\nCOVERAGE CHECKLIST - requirements_covered across your modules must contain EACH of these ids "
+        note += ("\nCOVERAGE CHECKLIST - requirements_covered across your modules must contain EACH of these ids, mandatory AND optional "
                  f"({len(must_ids)} in total): " + ", ".join(must_ids) +
                  "\nThe ONLY allowed reason to leave an id out: another clause shown above says the opposite about the same "
                  "thing (for example a different number of days) AND comes from a higher-authority document. In that case "
@@ -252,7 +274,7 @@ def _uncovered(selected, modules):
     cited = _cited(modules)
     out = []
     for d, rows in selected:
-        missing = [c for c in rows if OBLIGATION_RX.search(ex.clean_text(c["text"]))
+        missing = [c for c in rows if _is_requirement(c["text"])
                    and (d["document_id"], c["section_id"]) not in cited]
         if missing:
             out.append((d, missing))
@@ -281,7 +303,13 @@ def _add_conflict_context(db, uncovered, selected):
     return list(merged.values())
 
 
-def generate_plan_json(db, employee, request_id):
+# Requests still running when the time budget ends are not thrown away: they keep running and their modules
+# are merged into the saved plan when they finish, after which Python validates the plan again.
+_PENDING = {}                     # request_id -> list of (future, batch_note, docs)
+_MERGE_LOCK = threading.Lock()
+
+
+def generate_plan_json(db, employee, request_id, budget=None, finish_in_background=True):
     started = time.time()
     tpl = load_template("onboarding_plan")
     selected = retrieve_sources(db, employee["role"])
@@ -291,8 +319,11 @@ def generate_plan_json(db, employee, request_id):
     total = len(batches)
     app = current_app._get_current_object()
     workers = max(1, _setting("GENAI_PARALLEL", 32))   # all requests in one wave
-    budget = _setting("GENAI_TIME_BUDGET", 30)          # seconds for the whole plan (0 = no limit)
+    if budget is None:
+        budget = _setting("GENAI_TIME_BUDGET", 30)      # seconds for the whole plan (0 = no limit)
     deadline = started + budget - 3 if budget else None  # 3 s kept for Python validation
+    background = bool(deadline) and finish_in_background and bool(_setting("GENAI_FINISH_IN_BACKGROUND", 1))
+    retry_deadline = None if background else deadline    # background parts may still retry after the budget
 
     def run_batches(batch_list, label, note_extra=""):
         n = len(batch_list)
@@ -303,7 +334,7 @@ def generate_plan_json(db, employee, request_id):
                 system, prompt = _batch_prompt(tpl, employee, batch, index, n)
                 try:
                     plan, attempts = call_with_retry(db, system, prompt + note_extra, OnboardingPlan,
-                                                     f"{label} {index}/{n}", request_id, deadline)
+                                                     f"{label} {index}/{n}", request_id, retry_deadline)
                     return index, plan.model_dump(), attempts, None
                 except GenerationFailed as e:
                     return index, None, 0, str(e)
@@ -312,9 +343,16 @@ def generate_plan_json(db, employee, request_id):
         futures = {pool.submit(run, item): item[0] for item in enumerate(batch_list, start=1)}
         # wait at most until the deadline; requests still running after that are left out of the plan
         done, late = wait(futures, timeout=None if deadline is None else max(0.0, deadline - time.time()))
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.shutdown(wait=False, cancel_futures=not background)
         results = [f.result() for f in done]
-        results += [(futures[f], None, 0, "did not finish within the time budget") for f in late]
+        for f in late:
+            docs = ", ".join(d["document_id"] for d, _ in batch_list[futures[f] - 1])
+            if background:
+                note = f"Batch ({docs}) is still being generated after the {budget} s time budget; it is added automatically when it finishes."
+                _PENDING.setdefault(request_id, []).append((f, note))
+                results.append((futures[f], None, 0, "__late__:" + note))
+            else:
+                results.append((futures[f], None, 0, "did not finish within the time budget"))
         return sorted(results, key=lambda r: r[0])
 
     modules, summaries, missing_info = [], [], []
@@ -325,6 +363,9 @@ def generate_plan_json(db, employee, request_id):
         for index, part, attempts, err in results:
             calls += 1
             attempts_total += attempts
+            if err and err.startswith("__late__:"):
+                missing_info.append(err[len("__late__:"):])     # removed again when the background part is merged
+                continue
             if err:
                 failed_total += 1
                 docs = ", ".join(d["document_id"] for d, _ in batch_list[index - 1])
@@ -334,9 +375,92 @@ def generate_plan_json(db, employee, request_id):
             summaries.append(part.get("summary", ""))
             missing_info.extend(part.get("insufficient_information", []))
 
-    # pass 1: every approved source, in batches
-    merge(run_batches(batches, "onboarding_plan batch"), batches)
+    # pass 1: every approved source, in batches. Answers are merged as they arrive; the plan is returned as
+    # soon as every mandatory clause is covered. Requests that are slow ("stragglers") are hedged: after
+    # GENAI_HEDGE_AFTER seconds the clauses still missing are sent again as very small requests, and whichever
+    # answer arrives first is used.
+    category_of = {d["document_id"]: d["category"] for d, _ in selected}
+
+    def still_needed():
+        skipped = {a for a, b in parse_skip_claims(missing_info) if not skip_claim_problem(a, b, category_of)}
+        out = []
+        for d, rows in _uncovered(selected, modules):
+            keep = [c for c in rows if f"{d['document_id']}-{c['section_id']}" not in skipped]
+            if keep:
+                out.append((d, keep))
+        return out
+
+    def make_run(batch_list, label, note_extra=""):
+        n = len(batch_list)
+
+        def run(index):
+            with app.app_context():                 # each thread needs its own Flask context
+                system, prompt = _batch_prompt(tpl, employee, batch_list[index - 1], index, n)
+                try:
+                    part, attempts = call_with_retry(db, system, prompt + note_extra, OnboardingPlan,
+                                                     f"{label} {index}/{n}", request_id, retry_deadline)
+                    return index, part.model_dump(), attempts, None
+                except GenerationFailed as e:
+                    return index, None, 0, str(e)
+        return run
+
+    hedge_note = ("\n\nMISSING-CLAUSES REQUEST (speed): the clauses above are still missing from the plan. Write ONE short "
+                  "module that lists EACH clause above (mandatory, recommended or optional) in requirements_covered, with "
+                  "mandatory=true only for must/shall/required clauses, unless a higher-authority clause shown above overrules "
+                  "it (then write '<id>: overruled by <other id>' in insufficient_information).")
+    hedge_after = float(current_app.config.get("GENAI_HEDGE_AFTER", os.getenv("GENAI_HEDGE_AFTER", budget * 0.3 if budget else 0)) or 0)
+    # two hedge rounds: the second one re-sends whatever is still missing, in even smaller pieces
+    hedge_times = [started + hedge_after, started + hedge_after + (budget - 3 - hedge_after) * 0.5] if (hedge_after and budget) else []
+    sent_ids = set()
+    pool = ThreadPoolExecutor(max_workers=max(1, workers) * 2)
+    run_main = make_run(batches, "onboarding_plan batch")
+    outstanding = {pool.submit(run_main, i): ("main", i, batches) for i in range(1, total + 1)}
+    covered_early, wait_until = False, deadline
+    while outstanding:
+        stops = [t for t in (wait_until, hedge_times[0] if hedge_times else None) if t]
+        timeout = max(0.0, min(stops) - time.time()) if stops else None
+        done, _ = wait(list(outstanding), timeout=timeout, return_when=FIRST_COMPLETED)
+        for f in done:
+            _, index, blist = outstanding.pop(f)
+            merge([f.result()], blist)
+        if modules and not still_needed():
+            covered_early = True                     # every mandatory clause is in: no need to wait for the rest
+            break
+        if hedge_times and time.time() >= hedge_times[0]:
+            second = len(hedge_times) == 1
+            hedge_times.pop(0)
+            gaps = still_needed()
+            if second:                                  # round 2: only clauses not already re-sent in round 1
+                gaps = [(d, [c for c in rows if f"{d['document_id']}-{c['section_id']}" not in sent_ids]) for d, rows in gaps]
+                gaps = [(d, rows) for d, rows in gaps if rows]
+            if gaps and outstanding:
+                sent_ids.update(f"{d['document_id']}-{c['section_id']}" for d, rows in gaps for c in rows)
+                hb = make_batches(db, gaps, 1 if second else _setting("GENAI_HEDGE_CLAUSES", 2), pool=selected)
+                run_h = make_run(hb, "hedge batch", hedge_note)
+                for i in range(1, len(hb) + 1):
+                    outstanding[pool.submit(run_h, i)] = ("hedge", i, hb)
+        if wait_until and time.time() >= wait_until:
+            if modules:
+                break
+            wait_until = None                        # nothing arrived yet: wait for the first answer so the plan is never empty
+
+    if covered_early:
+        for f in outstanding:
+            f.cancel()
+        pool.shutdown(wait=False, cancel_futures=True)
+        outstanding = {}
+    else:
+        pool.shutdown(wait=False, cancel_futures=not background)
+    for f, (kind, index, blist) in outstanding.items():
+        docs = ", ".join(d["document_id"] for d, _ in blist[index - 1])
+        if background:
+            note = f"Batch ({docs}) is still being generated after the {budget} s time budget; it is added automatically when it finishes."
+            _PENDING.setdefault(request_id, []).append((f, note))
+            missing_info.append(note)
+        else:
+            missing_info.append(f"Batch ({docs}) could not be generated: did not finish within the time budget")
     if not modules:
+        _PENDING.pop(request_id, None)
         raise GenerationFailed(f"All {total} batches failed. See Logs & audit for the API error.")
 
     # gap-fill rounds: send only the obligation clauses that were not covered yet
@@ -345,7 +469,6 @@ def generate_plan_json(db, employee, request_id):
                 "Create new modules that cover EACH mandatory clause above in requirements_covered. "
                 "Skip a clause only if another clause shown above contradicts it and comes from a higher-authority "
                 "document; then write '<id>: overruled by <other id>' in insufficient_information.")
-    category_of = {d["document_id"]: d["category"] for d, _ in selected}
     for _ in range(_setting("GENAI_COVERAGE_ROUNDS", 0)):
         gaps = _uncovered(selected, modules)
         if not gaps or (deadline and deadline - time.time() < 12):
@@ -371,6 +494,7 @@ def generate_plan_json(db, employee, request_id):
             "attempts": attempts_total, "batches": calls, "failed_batches": failed_total,
             "gap_fill_rounds": rounds_done, "seconds": round(time.time() - started, 1),
             "time_budget": budget, "late_requests": sum(1 for x in missing_info if "time budget" in x),
+            "background_requests": len(_PENDING.get(request_id, [])),
             "source_versions": {d["document_id"]: d["version"] for d, _ in selected},
             "source_clause_count": sum(len(r) for _, r in selected)}
     return plan.model_dump(), meta
@@ -385,7 +509,74 @@ def create_plan(db, employee, user):
            "generation": meta, "created_by": user, "created_at": now(), "comments": [], "overrides": []}
     db.plans.insert_one(doc)
     log_audit("generate_plan", "plan", plan_id, after={"modules": len(plan_json["modules"])}, user=user)
+    _finish_in_background(db, plan_id, time.time() - meta["seconds"])
     return doc
+
+
+def _finish_in_background(db, plan_id, started):
+    """Attach the requests that outlived the time budget: each one merges its modules into the saved plan when
+    it finishes; when the last one is in, the plan is validated again by Python."""
+    pending = _PENDING.pop(plan_id, [])
+    if not pending:
+        return
+    app = current_app._get_current_object()
+    state = {"left": len(pending)}
+    # validate the first version now, before any late part can be merged, so a later merge is never overwritten
+    from python_validation.validator import run_validation
+    with _MERGE_LOCK:
+        result = run_validation(db, db.plans.find_one({"plan_id": plan_id}), "system")
+        all_in = result["scores"]["coverage"] >= 100 and (
+            not _setting("GENAI_COVER_ALL", 1) or not result.get("status_counts", {}).get("Optional Not Included"))
+        if all_in:
+            # every requirement is already covered: the parts still running would only add repeated
+            # modules, so the plan is complete now and they are discarded
+            plan = db.plans.find_one({"plan_id": plan_id})
+            pj, gen = plan["plan_json"], plan["generation"]
+            notes = {n for _, n in pending}
+            pj["insufficient_information"] = [x for x in pj.get("insufficient_information", []) if x not in notes]
+            gen.update(late_requests=0, background_requests=0, discarded_late_requests=len(pending), background_done=True,
+                       seconds_total=gen.get("seconds"))
+            db.plans.update_one({"_id": plan["_id"]}, {"$set": {"plan_json": pj, "original_plan_json": pj, "generation": gen}})
+            for f, _ in pending:
+                f.cancel()
+            return
+
+    def merge_late(fut, note):
+        try:
+            index, part, attempts, err = fut.result()
+        except Exception as e:                     # never let a background error break anything
+            part, err = None, f"{e.__class__.__name__}: {e}"
+        with _MERGE_LOCK, app.app_context():
+            plan = db.plans.find_one({"plan_id": plan_id})
+            if not plan:
+                return
+            pj, gen = plan["plan_json"], plan.get("generation", {})
+            notes = [x for x in pj.get("insufficient_information", []) if x != note]
+            if part:
+                pj["modules"].extend(_renumber(part["modules"], len(pj["modules"]) + 1))
+                notes.extend(part.get("insufficient_information", []))
+                gen["completed_in_background"] = gen.get("completed_in_background", 0) + 1
+            else:
+                notes.append(note.split(" is still")[0] + f" could not be generated: {str(err)[:200]}")
+                gen["failed_batches"] = gen.get("failed_batches", 0) + 1
+            pj["insufficient_information"] = notes
+            state["left"] -= 1
+            gen["late_requests"] = state["left"]
+            gen["seconds_total"] = round(time.time() - started, 1)
+            upd = {"plan_json": pj, "generation": gen}
+            if plan.get("status") in ("Generated", "Pending Review", "Verified"):
+                upd["original_plan_json"] = pj
+            db.plans.update_one({"_id": plan["_id"]}, {"$set": upd})
+            if state["left"] == 0:
+                from python_validation.validator import run_validation
+                log_audit("plan_completed_in_background", "plan", plan_id, after={"modules": len(pj["modules"]),
+                          "seconds_total": gen["seconds_total"]}, user="system")
+                if plan.get("status") != "Approved":
+                    run_validation(db, db.plans.find_one({"_id": plan["_id"]}), "system")
+                db.plans.update_one({"_id": plan["_id"]}, {"$set": {"generation.background_done": True}})
+
+    for fut, note in pending:
+        fut.add_done_callback(lambda f, n=note: merge_late(f, n))
 
 
 def add_missing_modules(db, plan, requirement_ids, user):
@@ -440,33 +631,65 @@ def add_missing_modules(db, plan, requirement_ids, user):
 
 
 def regenerate_modules(db, plan, module_ids, reason, user):
-    """Step 59 - selective regeneration: only the listed modules are rewritten."""
+    """Step 59 - selective regeneration: only the listed modules are rewritten.
+    Runs one request per module IN PARALLEL, with a short time budget (viva-friendly: a
+    reviewer should not wait 30-40s for 3-4 modules run one after another)."""
     tpl = load_template("module_regeneration")
     modules = plan["plan_json"]["modules"]
-    changed = []
-    for m in modules:
-        if m["module_id"] not in module_ids:
+    targets = [m for m in modules if m["module_id"] in module_ids]
+    budget = _setting("GENAI_REGEN_TIME_BUDGET", 10)   # seconds for the WHOLE selection, not per module
+    deadline = time.time() + budget if budget else None
+    app = current_app._get_current_object()
+
+    def run(m):
+        with app.app_context():
+            doc_ids = {rc["source_document_id"] for rc in m.get("requirements_covered", [])}
+            selected = retrieve_sources(db, plan["role"], doc_ids) or retrieve_sources(db, plan["role"])
+            values = {"company": COMPANY, "role": plan["role"], "experience_level": plan.get("experience_level", "Beginner"),
+                      "stages": stage_names(), "reason": reason, "module_id": m["module_id"],
+                      "current_module": json.dumps(m, indent=1), "sources": format_sources(selected)}
+            try:
+                new, _ = call_with_retry(db, tpl["system"].format(**values), tpl["user"].format(**values),
+                                         Module, "module_regeneration", plan["plan_id"], deadline)
+                new = new.model_dump(); new["module_id"] = m["module_id"]
+                return m["module_id"], new, None
+            except GenerationFailed as e:
+                return m["module_id"], None, str(e)
+
+    pool = ThreadPoolExecutor(max_workers=max(1, min(len(targets), 8)))
+    futures = {pool.submit(run, m): m for m in targets}
+    done, late = wait(futures, timeout=None if deadline is None else max(0.0, deadline - time.time()))
+    pool.shutdown(wait=False, cancel_futures=True)
+    results = {}
+    for f in done:
+        mid, new, err = f.result()
+        results[mid] = (new, err)
+    for f in late:
+        results[futures[f]["module_id"]] = (None, "did not finish within the time budget")
+
+    changed, failed = [], []
+    by_id = {m["module_id"]: m for m in modules}
+    for mid, (new, err) in results.items():
+        if new is None:
+            failed.append((mid, err))
             continue
-        doc_ids = {rc["source_document_id"] for rc in m.get("requirements_covered", [])}
-        selected = retrieve_sources(db, plan["role"], doc_ids) or retrieve_sources(db, plan["role"])
-        values = {"company": COMPANY, "role": plan["role"], "experience_level": plan.get("experience_level", "Beginner"),
-                  "stages": stage_names(), "reason": reason, "module_id": m["module_id"],
-                  "current_module": json.dumps(m, indent=1), "sources": format_sources(selected)}
-        new, _ = call_with_retry(db, tpl["system"].format(**values), tpl["user"].format(**values),
-                                 Module, "module_regeneration", plan["plan_id"])
-        new = new.model_dump()
-        new["module_id"] = m["module_id"]
-        changed.append({"module_id": m["module_id"], "before": m, "after": new})
+        m = by_id[mid]
+        changed.append({"module_id": mid, "before": dict(m), "after": new})
         m.clear(); m.update(new)
-    gen = plan.get("generation", {})
-    gen.setdefault("regenerations", []).append({"at": now(), "modules": module_ids, "reason": reason,
-                                                "prompt_version": tpl["version"]})
-    gen["source_versions"] = {d["document_id"]: d["version"] for d in db.documents.find({"status": "Active"})}
-    db.plans.update_one({"_id": plan["_id"]}, {"$set": {"plan_json": plan["plan_json"], "generation": gen},
-                                               "$unset": {"outdated": ""}})
-    log_audit("regenerate_modules", "plan", plan["plan_id"], before=[c["before"]["module_title"] for c in changed],
-              after=[c["after"]["module_title"] for c in changed], comment=reason, user=user)
-    return changed
+    if changed:
+        gen = plan.get("generation", {})
+        gen.setdefault("regenerations", []).append({"at": now(), "modules": [c["module_id"] for c in changed],
+                                                    "reason": reason, "prompt_version": tpl["version"],
+                                                    "failed": failed or None})
+        gen["source_versions"] = {d["document_id"]: d["version"] for d in db.documents.find({"status": "Active"})}
+        db.plans.update_one({"_id": plan["_id"]}, {"$set": {"plan_json": plan["plan_json"], "generation": gen},
+                                                   "$unset": {"outdated": ""}})
+        log_audit("regenerate_modules", "plan", plan["plan_id"], before=[c["before"]["module_title"] for c in changed],
+                  after=[c["after"]["module_title"] for c in changed], comment=reason, user=user)
+    if failed and not changed:
+        raise GenerationFailed("None of the selected modules could be regenerated in time: "
+                               + "; ".join(f"{mid} ({err})" for mid, err in failed))
+    return changed, failed
 
 
 def topic_module(db, topic, role=None):
