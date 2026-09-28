@@ -1,11 +1,36 @@
-This file records the use of AI tools during the project, as required by the SRS.
+ AI Tool Usage:
 
-Claude (Anthropic) was used for project planning and to help develop the logic of different parts of the project. It was also used to provide explanations about the project and its implementation.
+All team members maintained active control over the codebase. Generative AI tools were used for conceptual clarification, architectural guidance, synthetic company dataset creation, test design assistance, and documentation polishing. Every piece of logic, backend algorithm, database operation, and test assertion was reviewed, customized, integrated, and validated by the team before adoption.
 
-OpenAI API (GPT-5.6) was used during runtime to generate onboarding plans for Pipeline 1.
+2. Phase-by-Phase AI Tool Usage
+Phase 1: SRS Requirement Deconstruction and Conceptual Analysis
+Tool: Claude AI (Anthropic) Purpose: Understanding the complex Software Requirements Specification (SRS), mapping competition anti-shortcut rules, and clarifying system architecture. Prompt and Assistance Type: Conversational prompts asking for breakdown of dual-pipeline requirements, explanation of ground-truth validation vs. GenAI generation, and clarification of scoring formulations. Files and Modules Affected: Project planning documents and system architecture notes. Modifications Made: Converted AI high-level explanations into concrete technical milestones and a localized project roadmap tailored to our banking domain. Tests Performed: Evaluated conceptual design against SRS sections 1.2, 1.6, and 1.8 to ensure no prohibited shortcuts were introduced. Verifying Team Member: Lead Developer / Team Member
 
-Google Gemini API was used as an alternative provider for Pipeline 1 and can be switched through the `.env` configuration.
+Phase 2: Application Backend Development and Pipeline Logic
+Tool: Claude AI (Anthropic) Purpose: Architectural consultation and logic refinement when developing complex backend algorithms, specifically the dual-pipeline validation engine and prompt injection regex rules. Prompt and Assistance Type: Targeted coding assistance where the developer wrote the initial application structure, encountered complex implementation roadblocks (such as cosine similarity scoring, handling policy precedence rules, and preventing prompt leaks), and prompted Claude AI for algorithm suggestions. Files and Modules Affected: python_validation/validator.py, config/precedence_rules.yaml, security/injection.py, and genai_pipeline/generator.py. Modifications Made: The developer took the suggested logic, refactored it to fit the Flask application structure, adapted data structures to match MongoDB document schemas, and fine-tuned validation thresholds for banking accuracy. Tests Performed: Interactive debugging sessions, print logging, unit testing with mock data, and manual verification of validation scores. Verifying Team Member: Lead Developer / Backend Engineer
 
-The AI tools were mainly used to assist with planning, understanding the project, developing logic, and generating runtime responses where required.
+Phase 3: Automated Test Suite Development and Quality Assurance
+Tool: Claude AI (Anthropic) Purpose: Expanding automated Pytest test coverage after initial manual functional testing. Prompt and Assistance Type: After manually testing features directly through the web interface, the developer provided module interfaces to Claude AI to generate comprehensive unit and integration test scripts covering edge cases, boundary conditions, and mock API failures. Files and Modules Affected: tests/test_documents.py, tests/test_genai_and_validation.py, tests/test_security.py, and tests/test_hidden_pack.py. Modifications Made: Adjusted test assertions to match realistic database responses, integrated mongomock fixtures, and added custom test assertions for hidden text detection and token verification. Tests Performed: Executed full test runs using pytest tests/ -v, verifying 100% pass rates across all 147 test cases. Verifying Team Member: QA Lead / Developer
 
-For the GUI, I selected the fonts and background independently and used AI only to obtain suggestions and recommendations regarding their overall appearance.
+Phase 4: Fictional Company Pack and Synthetic Dataset Creation
+Tool: Claude AI (Anthropic) Purpose: Generating the complete synthetic organizational dataset for Sitara Bank Limited, including policies, SOPs, job descriptions, FAQs, and adversarial test documents. Prompt and Assistance Type: Structured generation prompts instructing the AI to create realistic banking documents with deliberate clause variations, version differences (Version 1.0 vs. Version 2.0), department-specific instructions, policy conflicts, and subtle prompt injection attempts. Files and Modules Affected: sample_documents/Sitara_Bank_Company_Pack/ (over 20 policy and SOP documents in PDF and DOCX formats), data/roles.csv, and data/role_requirement_matrix.csv. Modifications Made: The team reviewed all generated text, formatted them into professional Word and PDF documents with formal headers and tables, verified that policy cross-references were realistic, and confirmed that numbers matched financial regulations. Tests Performed: Document ingestion tests, parsing tests, text extraction verification, and chunking validation through test_documents.py. Verifying Team Member: Data and Compliance Lead / Developer
+
+Phase 5: Technical Documentation and Deliverables Formatting
+Tool: Antigravity AI Purpose: Structuring, reviewing, and formatting the official project deliverables, reports, and README files in accordance with SRS documentation rubrics. Prompt and Assistance Type: Review prompts providing raw project details, test outputs, and system metrics to Antigravity AI to draft humanized, clean, and comprehensive project deliverables without robotic phrasing or formatting clutter. Files and Modules Affected: reports/Deliverable_7_Onboarding_Plan_Evidence.md, reports/Deliverable_8_Validation_Report.md, reports/Deliverable_9_Security_Testing_Report.md, reports/Deliverable_10_Test_Cases.md, reports/Deliverable_11_Installation_Instructions.md, reports/Deliverable_12_Execution_Instructions.md, reports/Deliverable_13_GitHub_Repository.md, and reports/Deliverable_14_Deployed_Application.md. Modifications Made: Refined tone to be clear and conversational, removed automated AI styling artifacts (such as ASCII boxes and excessive dividers), and ensured all sub-headings directly reflected the SRS guidelines. Tests Performed: Proofreading, heading alignment verification against the SRS table of contents, and cross-checking facts with actual codebase behavior. Verifying Team Member: Lead Developer / Project Documenter
+
+3. Summary of AI Tools Used
+Tool: Claude AI (Anthropic) Roles Supported: SRS Analysis, Backend Logic Assistance, Test Case Expansion, Synthetic Company Dataset Creation. Verification Method: Manual code review, step-by-step local testing, adaptation into existing codebase, and Pytest validation.
+
+Tool: Antigravity AI Roles Supported: Technical Documentation Review, Deliverables Structuring, Formatting, and Humanized Report Generation. Verification Method: Manual line-by-line review against SRS Section 1.10 requirements and factual verification against codebase files.
+
+Tool: OpenAI API (GPT-4o / GPT-5.6) Roles Supported: Runtime Onboarding Plan Generation (Pipeline 1). Verification Method: Ground-truth validation via independent Python engine (Pipeline 2) and Pydantic schema validation.
+
+Tool: Google Gemini API (Gemini 2.5 Flash) Roles Supported: Alternative Runtime Provider for Pipeline 1. Verification Method: Python validation engine comparison and structured JSON schema verification.
+
+4. Declaration of Genuine Effort
+The team certifies that:
+
+All AI tools were used ethically as collaborative development aids and not as unverified code drop-ins.
+The team understands every line of code submitted in the repository, can explain every architectural decision, and can modify or debug any component live during evaluation.
+No live secrets, proprietary keys, or confidential organizational data were shared with external AI services.
+The application logic, database design, and dual-pipeline architecture reflect genuine engineering problem-solving aligned with the competition standards.
