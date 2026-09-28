@@ -148,7 +148,7 @@ def capture(live=False):
         set_client_override(rd)
         t0 = time.time()
         try:
-            pj, meta = G.generate_plan_json(db, emp, "evidence-budget")
+            pj, meta = G.generate_plan_json(db, emp, "evidence-budget", finish_in_background=False)
             bundle["scenarios"]["budget"] = {"budget": budget, "hang": hang, "seconds": round(time.time() - t0, 1), "late": meta.get("late_requests"),
                                              "modules": len(pj["modules"]), "notes": [x for x in pj.get("insufficient_information", []) if "time budget" in x][:2]}
         except G.GenerationFailed as e:
