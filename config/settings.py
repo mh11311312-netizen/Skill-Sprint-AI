@@ -8,7 +8,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
-    MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+    MONGO_URI = (
+        os.getenv("MONGO_URI")
+        or os.getenv("MONGO_URL")
+        or os.getenv("MONGODB_URI")
+        or "mongodb://localhost:27017/"
+    )
     MONGO_DB = os.getenv("MONGO_DB", "skillsprint")
     USE_MONGOMOCK = os.getenv("USE_MONGOMOCK", "0") == "1"   # in-memory DB for tests only
 
